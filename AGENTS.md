@@ -28,3 +28,10 @@ PR governance:
 - CI must pass before merge.
 - Do not deploy from PR branches.
 - Do not deploy to LAX, stop the current LAX systemd timer, modify the production hub, or add production secrets without explicit manual approval.
+
+Autonomous Git/PR policy:
+- When a goal explicitly allows autonomous development, Codex may create a feature branch, commit, push, open a PR, wait for CI, and squash-merge if safety checks pass.
+- Prefer `scripts/run-goal-pr.ps1` for autonomous PR setup, validation, commit, push, and PR creation.
+- Prefer `scripts/merge-pr-if-green.ps1` for guarded auto-merge.
+- Auto-merge is forbidden when CI fails, high-risk production files are touched, obvious secret markers appear in the diff, or the goal involves LAX deployment or production hub changes.
+- After a successful autonomous merge, return to `main` and pull the latest `origin/main`.
