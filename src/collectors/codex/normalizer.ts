@@ -178,7 +178,7 @@ function nodeInfo(config: Config): CodexUsageSnapshot["node"] {
 }
 
 function omittedKeys(record: Record<string, unknown>): string[] {
-  return Object.keys(record).filter((key) => SENSITIVE_RAW_KEYS.has(key)).sort();
+  return Object.keys(record).some((key) => SENSITIVE_RAW_KEYS.has(key)) ? ["sensitive_raw_fields"] : [];
 }
 
 function pickPercent(limit: CodexRateLimit | undefined): Pick<CodexRateLimit, "used_percent" | "remaining_percent"> | undefined {

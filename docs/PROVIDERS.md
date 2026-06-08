@@ -32,3 +32,7 @@ The container starts tmux, runs Codex, sends `/status`, captures the pane, redac
 ## container-codex
 
 Reserved for a future container-installed Codex command. The provider interface already supports adding it.
+
+## LAX backend usage Docker mode
+
+Use `CODEX_PROVIDER=backend-usage` for the primary Docker migration path. The provider value is explicit documentation for operators; the backend collector reads `CODEX_HOME` directly and does not invoke the tmux fallback provider path.

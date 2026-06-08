@@ -5,6 +5,7 @@ describe("usage collector config", () => {
   it("defaults to backend usage and keeps tmux fallback disabled", () => {
     const config = loadConfig({}, []);
     expect(config.collectorMode).toBe("codex-backend-usage");
+    expect(config.provider).toBe("backend-usage");
     expect(config.intervalSeconds).toBe(300);
   });
 

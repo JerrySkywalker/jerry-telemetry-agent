@@ -2,7 +2,6 @@ node_modules/
 dist/
 .env
 .env.*
-!.env.example
 state/
 spool/
 tmp/
@@ -17,3 +16,4 @@ codex-usage-test/
 .env.*
 *.local.env
 auth.json
+!deploy/**/.env.example

@@ -12,7 +12,7 @@ services:
       CODEX_USAGE_LAST_GOOD_PATH: ${CODEX_USAGE_LAST_GOOD_PATH:-/state/codex-usage-last-good.safe.snapshot.json}
       CODEX_HOME: ${CODEX_HOME:-/host-codex-home}
       CODEX_USAGE_ENDPOINT: ${CODEX_USAGE_ENDPOINT:-https://chatgpt.com/backend-api/wham/usage}
-      CODEX_PROVIDER: ${CODEX_PROVIDER:-file}
+      CODEX_PROVIDER: ${CODEX_PROVIDER:-backend-usage}
       CODEX_STATUS_LATEST_PATH: ${CODEX_STATUS_LATEST_PATH:-/input/latest.json}
       STATE_PATH: ${STATE_PATH:-/state/agent-state.json}
       SPOOL_DIR: ${SPOOL_DIR:-/state/spool}
