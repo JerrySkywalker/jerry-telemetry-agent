@@ -14,6 +14,13 @@ npm run build
 docker compose config
 ```
 
+Full local validation:
+
+```powershell
+scripts/validate-local.ps1
+scripts/scan-secrets-light.ps1
+```
+
 For local backend usage stdout mode:
 
 ```powershell
@@ -30,3 +37,16 @@ npm run dev -- --once --collector codex-cli-status-fallback --provider file
 ```
 
 Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_SECRET`, access tokens, refresh tokens, raw `auth.json`, or raw backend usage responses.
+
+## Development Workflow
+
+Future development uses PR-based governance even when local work is done in YOLO mode:
+
+```powershell
+scripts/new-pr-branch.ps1 feat/backend-usage-hardening
+scripts/pr-ready-check.ps1
+```
+
+PRs target `main`, must pass CI, and must not deploy to LAX or modify the production hub. Production LAX migration requires explicit manual approval.
+
+See [docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md) and [docs/CD_PLAN.md](docs/CD_PLAN.md).

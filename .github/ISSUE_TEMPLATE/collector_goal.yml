@@ -1,0 +1,50 @@
+name: Collector goal
+description: Define a future telemetry collector task.
+title: "collector: "
+labels: ["collector"]
+body:
+  - type: dropdown
+    id: collector
+    attributes:
+      label: Collector area
+      options:
+        - codex backend usage
+        - server metrics
+        - docker container state
+        - network latency
+        - domain/tls expiry
+        - proxy health
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What telemetry should be collected and why?
+    validations:
+      required: true
+  - type: textarea
+    id: schema
+    attributes:
+      label: Proposed normalized schema
+      description: Include fields, redaction rules, and sample safe payloads.
+  - type: textarea
+    id: source
+    attributes:
+      label: Data source and permissions
+      description: What local files, commands, APIs, or Docker mounts are needed?
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Guardrails
+      options:
+        - label: No raw account IDs, session IDs, emails, access tokens, refresh tokens, or telemetry secrets will be emitted.
+          required: true
+        - label: Docker contains required agent-side runtime dependencies.
+          required: true
+        - label: Production LAX deployment requires explicit manual approval.
+          required: true

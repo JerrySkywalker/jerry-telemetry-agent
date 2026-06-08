@@ -23,3 +23,15 @@ Non-2xx hub responses are treated as failures. Events are written to `SPOOL_DIR`
 ## Duplicate payload skipped
 
 By default identical payloads are not resent. Set `FORCE_SEND=true` to override.
+
+## CI fails on docker compose config
+
+Run `docker compose config` locally from the repository root. This validates Compose syntax and environment interpolation without building images or contacting Docker Hub.
+
+## PR ready check fails with dirty working tree
+
+Commit or stash local changes before running `scripts/pr-ready-check.ps1`. The check requires a clean branch so the PR description and validation results match the code being reviewed.
+
+## Light secret scan fails
+
+Remove forbidden local files such as `.env`, `auth.json`, or raw usage dumps from the repository tree. If the scanner reports a possible token assignment, replace the value with an example placeholder or move the secret to local environment configuration.
