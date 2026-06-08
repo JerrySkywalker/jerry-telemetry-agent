@@ -19,7 +19,8 @@ export class CodexUsageCollectionError extends Error {
       | "http_5xx"
       | "network_error"
       | "schema_error",
-    message: string
+    message: string,
+    readonly diagnostics: { httpStatus?: number; endpointFamily?: "wham_usage" } = {}
   ) {
     super(message);
   }
@@ -59,6 +60,11 @@ function findAccessToken(value: unknown): string | undefined {
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   if (typeof record.access_token === "string" && record.access_token.length > 0) return record.access_token;
+  const tokens = record.tokens;
+  if (tokens && typeof tokens === "object" && !Array.isArray(tokens)) {
+    const tokenRecord = tokens as Record<string, unknown>;
+    if (typeof tokenRecord.access_token === "string" && tokenRecord.access_token.length > 0) return tokenRecord.access_token;
+  }
   for (const item of Object.values(record)) {
     if (item && typeof item === "object") {
       const found = findAccessToken(item);

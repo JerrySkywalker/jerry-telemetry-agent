@@ -1,4 +1,5 @@
 import os from "node:os";
+import path from "node:path";
 
 export type AgentMode = "once" | "daemon";
 export type ProviderMode = "backend-usage" | "file" | "host-codex" | "container-codex";
@@ -36,6 +37,15 @@ export interface Config {
   healthServerEnabled: boolean;
   healthHost: string;
   healthPort: number;
+}
+
+export function defaultCodexHome(env: NodeJS.ProcessEnv = process.env, platform = process.platform, homeDir = os.homedir()): string {
+  if (env.CODEX_HOME) return env.CODEX_HOME;
+  if (platform === "win32") {
+    const userProfile = env.USERPROFILE;
+    if (userProfile) return path.win32.join(userProfile, ".codex");
+  }
+  return path.join(homeDir, ".codex");
 }
 
 function bool(value: string | undefined, fallback: boolean): boolean {
@@ -101,7 +111,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     provider: provider(cliProvider ?? env.CODEX_PROVIDER ?? "backend-usage"),
     outputModes: outputModes(env.TELEMETRY_OUTPUT_MODE),
     intervalSeconds: int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300),
-    codexHome: env.CODEX_HOME ?? `${os.homedir()}/.codex`,
+    codexHome: defaultCodexHome(env),
     codexUsageEndpoint: env.CODEX_USAGE_ENDPOINT ?? "https://chatgpt.com/backend-api/wham/usage",
     codexStatusLatestPath: env.CODEX_STATUS_LATEST_PATH ?? "/input/latest.json",
     hostCodexBin: env.HOST_CODEX_BIN ?? "/host-bin/codex",

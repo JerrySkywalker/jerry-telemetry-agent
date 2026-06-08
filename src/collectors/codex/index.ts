@@ -17,7 +17,7 @@ export async function collectCodexUsage(config: Config, lastGoodExists = false):
     return normalizeCodexUsage(rawUsage, config);
   } catch (error) {
     if (error instanceof CodexUsageCollectionError) {
-      return errorSnapshot(config, error.code, error.message, new Date().toISOString(), lastGoodExists);
+      return errorSnapshot(config, error.code, error.message, new Date().toISOString(), lastGoodExists, error.diagnostics);
     }
     return errorSnapshot(config, "network_error", (error as Error).message, new Date().toISOString(), lastGoodExists);
   }

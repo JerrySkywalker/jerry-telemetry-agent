@@ -2,7 +2,7 @@
 
 ## codex-backend-usage
 
-Default collector. Reads `CODEX_HOME/auth.json`, extracts a ChatGPT-managed `access_token`, and calls `CODEX_USAGE_ENDPOINT`.
+Default and primary collector. Reads `CODEX_HOME/auth.json`, extracts a ChatGPT-managed `tokens.access_token` or another supported `access_token` schema, and calls `CODEX_USAGE_ENDPOINT`.
 
 Default endpoint:
 
@@ -12,7 +12,7 @@ https://chatgpt.com/backend-api/wham/usage
 
 The agent does not call OAuth refresh endpoints. Codex CLI remains responsible for maintaining auth.
 
-The raw response is normalized internally and discarded. Sinks receive only `codex.usage.snapshot`.
+The raw response is normalized internally and discarded. Sinks receive only `codex.usage.snapshot`; raw account IDs, user IDs, email, promo, referral beacon, auth tokens, and the full raw response are never emitted.
 
 ## file
 
@@ -20,7 +20,7 @@ Migration fallback only. Reads `CODEX_STATUS_LATEST_PATH`, validates it as Codex
 
 ## host-codex
 
-Fallback only. Disabled unless `TELEMETRY_ENABLE_TMUX_FALLBACK=true` or `--collector codex-cli-status-fallback` is used.
+Fallback only. Disabled unless `TELEMETRY_ENABLE_TMUX_FALLBACK=true` or `--collector codex-cli-status-fallback` is used. `/status` pane capture is not the primary production path.
 
 Uses a host-mounted Codex binary and host-mounted Codex home:
 - `HOST_CODEX_BIN=/host-bin/codex`
@@ -35,4 +35,4 @@ Reserved for a future container-installed Codex command. The provider interface 
 
 ## LAX backend usage Docker mode
 
-Use `CODEX_PROVIDER=backend-usage` for the primary Docker migration path. The provider value is explicit documentation for operators; the backend collector reads `CODEX_HOME` directly and does not invoke the tmux fallback provider path.
+Use `CODEX_PROVIDER=backend-usage` for the primary Docker migration path. The provider value is explicit documentation for operators; the backend collector reads `CODEX_HOME` directly and does not invoke the tmux fallback provider path. Mount the host Codex auth directory read-only, for example `/home/ubuntu/.codex:/host-codex-home:ro`, and set `CODEX_HOME=/host-codex-home`.

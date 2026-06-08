@@ -17,7 +17,7 @@ Runtime:
 - `TELEMETRY_OUTPUT_FILE=/state/codex-usage-latest.safe.snapshot.json`
 - `CODEX_USAGE_LATEST_PATH=/state/codex-usage-latest.safe.snapshot.json`
 - `CODEX_USAGE_LAST_GOOD_PATH=/state/codex-usage-last-good.safe.snapshot.json`
-- `CODEX_HOME=~/.codex`
+- `CODEX_HOME=~/.codex` on Unix-like hosts, `%USERPROFILE%\.codex` on Windows
 - `CODEX_USAGE_ENDPOINT=https://chatgpt.com/backend-api/wham/usage`
 - `CODEX_PROVIDER=backend-usage|file|host-codex|container-codex`
 - `STATE_PATH=/state/agent-state.json`
@@ -61,3 +61,7 @@ npm run dev -- --once --collector codex-backend-usage
 ```
 
 HTTP upload is enabled only when `TELEMETRY_OUTPUT_MODE` includes `http` and all upload settings are present.
+
+`codex-backend-usage` is the primary collector. `codex-cli-status-fallback` and tmux `/status` capture are migration fallbacks only and remain disabled by default.
+
+For Docker backend usage mode, mount the host Codex auth directory read-only and set `CODEX_HOME` to that mount. The image must not include `auth.json`; the host only needs Docker and an installed/authenticated Codex CLI.

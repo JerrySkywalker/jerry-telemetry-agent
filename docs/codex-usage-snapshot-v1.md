@@ -33,6 +33,7 @@ type CodexUsageSnapshot = {
     error_code?: string;
     message?: string;
     stale?: boolean;
+    http_status?: number;
   };
   limits: CodexRateLimit[];
   credits?: {

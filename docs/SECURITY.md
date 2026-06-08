@@ -4,6 +4,7 @@
 - `TELEMETRY_NODE_SECRET` is used only for HMAC signing.
 - Secret-like environment values are not logged.
 - The backend collector never logs, uploads, or persists `access_token`, `refresh_token`, raw `auth.json`, email, account ID, user ID, referral beacon, promo, or the full raw ChatGPT backend response.
+- The collector may read `tokens.access_token` from local Codex auth, but it stores only normalized usage percentages, reset times, plan type, credits, spend-control summary, and safe error diagnostics.
 - Raw Codex account and session IDs are redacted before fallback upload.
 - Payloads that still contain unredacted account or session identifiers are rejected.
 - HTTP output sends only the normalized `codex.usage.snapshot` inside the hub envelope.
@@ -22,3 +23,4 @@
 - LAX Docker backend usage mode mounts the host Codex directory read-only.
 - The Docker image must not contain `auth.json` or any copied Codex credential material.
 - Local smoke scripts write only normalized safe snapshots and must not upload to the telemetry hub.
+- LAX production systemd timers remain unchanged until explicit manual approval.
