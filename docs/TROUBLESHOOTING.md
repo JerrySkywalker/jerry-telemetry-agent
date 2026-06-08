@@ -44,6 +44,41 @@ Run or re-authenticate Codex CLI on the LAX host. Do not copy local `auth.json` 
 
 For LAX Docker mode, mount `/home/ubuntu/.codex:/host-codex-home:ro` and set `CODEX_HOME=/host-codex-home`.
 
+## LAX dry-run fails at docker compose config
+
+Run the preflight first:
+
+```powershell
+scripts/lax-backend-usage-preflight.ps1
+```
+
+Confirm Docker Compose is available on LAX and that `~/jerry-telemetry-agent/deploy/lax/docker-compose.yml.example` exists. The dry-run writes `~/jerry-telemetry-agent/docker-compose.dry-run.yml` and should not require a telemetry secret.
+
+## LAX dry-run reports snapshot status.ok is not true
+
+Inspect only the safe status fields in `~/jerry-telemetry-agent/state/codex-usage-latest.safe.snapshot.json`, such as `status.error_code`, `status.message`, and `status.http_status`. Do not print or paste `~/.codex/auth.json`.
+
+Common causes:
+
+- `/home/ubuntu/.codex` is not present on LAX.
+- `auth.json` exists but does not contain `tokens.access_token`.
+- The Codex backend endpoint changed or returned an HTTP error.
+- The container did not mount `/home/ubuntu/.codex:/host-codex-home:ro`.
+
+## LAX dry-run reports limits_count is zero
+
+The dry-run requires a successful backend usage snapshot with at least one normalized rate limit. Re-run after confirming Codex CLI is authenticated on the LAX host. If `status.ok=true` but `limits_count=0`, treat it as a schema or backend response change and update tests before any production migration.
+
+## LAX real-once latest event is missing
+
+Do not retry in daemon mode. Check the one-shot container output and spooled events under `~/jerry-telemetry-agent/state/spool`. Confirm `TELEMETRY_OUTPUT_MODE=file,http`, `TELEMETRY_NODE_ID=us-lax-pro-01`, and the production secret were set manually on LAX outside git.
+
+Verify the old status timer was not changed:
+
+```bash
+systemctl status codex-status-telemetry.timer --no-pager
+```
+
 ## Local backend smoke fails
 
 Run:
