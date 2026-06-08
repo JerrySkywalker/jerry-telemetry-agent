@@ -1,10 +1,26 @@
-# Providers
+# Providers And Collectors
+
+## codex-backend-usage
+
+Default collector. Reads `CODEX_HOME/auth.json`, extracts a ChatGPT-managed `access_token`, and calls `CODEX_USAGE_ENDPOINT`.
+
+Default endpoint:
+
+```text
+https://chatgpt.com/backend-api/wham/usage
+```
+
+The agent does not call OAuth refresh endpoints. Codex CLI remains responsible for maintaining auth.
+
+The raw response is normalized internally and discarded. Sinks receive only `codex.usage.snapshot`.
 
 ## file
 
-Reads `CODEX_STATUS_LATEST_PATH`, validates it as Codex latest JSON, redacts sensitive fields, and returns it.
+Migration fallback only. Reads `CODEX_STATUS_LATEST_PATH`, validates it as Codex latest JSON, redacts sensitive fields, and adapts it to `codex.usage.snapshot`.
 
 ## host-codex
+
+Fallback only. Disabled unless `TELEMETRY_ENABLE_TMUX_FALLBACK=true` or `--collector codex-cli-status-fallback` is used.
 
 Uses a host-mounted Codex binary and host-mounted Codex home:
 - `HOST_CODEX_BIN=/host-bin/codex`

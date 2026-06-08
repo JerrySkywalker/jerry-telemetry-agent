@@ -2,7 +2,7 @@ import type { Config } from "../config.js";
 
 export interface TelemetryEnvelope {
   schema_version: "v1";
-  event_type: "codex.status";
+  event_type: "codex.status" | "codex.usage.snapshot";
   source: {
     node_id: string;
     hostname: string;
@@ -14,9 +14,10 @@ export interface TelemetryEnvelope {
 }
 
 export function buildEnvelope(config: Config, payload: Record<string, unknown>, capturedAt = new Date().toISOString()): TelemetryEnvelope {
+  const eventType = payload.type === "codex.usage.snapshot" ? "codex.usage.snapshot" : "codex.status";
   return {
     schema_version: "v1",
-    event_type: "codex.status",
+    event_type: eventType,
     source: {
       node_id: config.nodeId,
       hostname: config.hostname,

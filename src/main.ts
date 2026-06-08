@@ -1,24 +1,18 @@
 import { assertUploadConfig, loadConfig, type Config } from "./config.js";
 import { pathToFileURL } from "node:url";
+import { access } from "node:fs/promises";
 import { logger } from "./logger.js";
-import { FileProvider } from "./providers/fileProvider.js";
-import { HostCodexProvider } from "./providers/hostCodexProvider.js";
-import type { CodexProvider } from "./providers/provider.js";
 import { buildEnvelope, stablePayloadHash } from "./telemetry/envelope.js";
 import { readState, updateState } from "./telemetry/state.js";
 import { listSpooledEvents, quarantineSpooledEvent, removeSpooledEvent, spoolEvent } from "./telemetry/spool.js";
 import { uploadEvent } from "./telemetry/uploader.js";
 import { startHealthServer } from "./health/server.js";
-
-function createProvider(config: Config): CodexProvider {
-  if (config.provider === "file") return new FileProvider(config);
-  if (config.provider === "host-codex") return new HostCodexProvider(config);
-  throw new Error("container-codex provider is reserved and not implemented yet");
-}
+import { collectCodexUsage } from "./collectors/codex/index.js";
+import { writeSnapshotFile } from "./sinks/fileSink.js";
 
 async function sendOrDryRun(config: Config, event: unknown): Promise<void> {
   if (config.dryRun) {
-    logger.info("dry-run telemetry event", { event });
+    logger.info("dry-run telemetry event");
     return;
   }
   await uploadEvent(config, event);
@@ -41,42 +35,72 @@ async function retrySpool(config: Config): Promise<void> {
 }
 
 export async function runOnce(config: Config): Promise<void> {
-  assertUploadConfig(config);
-  await retrySpool(config);
-  const provider = createProvider(config);
-  const result = await provider.collect();
-  const hash = stablePayloadHash(result.payload);
+  if (config.outputModes.includes("http")) {
+    assertUploadConfig(config);
+    await retrySpool(config);
+  }
   const state = await readState(config.statePath);
+  const snapshot = await collectCodexUsage(config, Boolean(state.lastSuccessfulUsageAt) || (await fileExists(config.usageLastGoodPath)));
+  const hash = stablePayloadHash(snapshot);
+
+  await writeSnapshotFile(config.usageLatestPath, snapshot);
+  if (snapshot.status.ok) {
+    await writeSnapshotFile(config.usageLastGoodPath, snapshot);
+  }
+  if (config.outputModes.includes("file")) {
+    await writeSnapshotFile(config.outputFile, snapshot);
+  }
+  if (config.outputModes.includes("stdout")) {
+    process.stdout.write(`${JSON.stringify(snapshot)}\n`);
+  }
 
   if (!config.forceSend && state.lastPayloadHash === hash) {
-    logger.info("skipping unchanged codex status", { capturedAt: result.capturedAt });
+    logger.info("skipping unchanged codex usage snapshot", { observedAt: snapshot.observed_at });
     await updateState(config.statePath, {
-      lastPayloadCapturedAt: result.capturedAt,
-      lastSourceFile: result.sourceFile,
+      lastPayloadCapturedAt: snapshot.observed_at,
       lastError: undefined
     });
     return;
   }
 
-  const event = buildEnvelope(config, result.payload, new Date().toISOString());
+  if (!config.outputModes.includes("http")) {
+    await updateState(config.statePath, {
+      lastPayloadCapturedAt: snapshot.observed_at,
+      lastPayloadHash: hash,
+      lastSuccessfulUsageAt: snapshot.status.ok ? snapshot.observed_at : state.lastSuccessfulUsageAt,
+      lastError: snapshot.status.ok ? undefined : snapshot.status.message
+    });
+    return;
+  }
+
+  const event = buildEnvelope(config, snapshot as unknown as Record<string, unknown>, snapshot.observed_at);
   try {
     await sendOrDryRun(config, event);
     await updateState(config.statePath, {
-      lastPayloadCapturedAt: result.capturedAt,
+      lastPayloadCapturedAt: snapshot.observed_at,
       lastPayloadHash: hash,
-      lastSourceFile: result.sourceFile,
+      lastSuccessfulUsageAt: snapshot.status.ok ? snapshot.observed_at : state.lastSuccessfulUsageAt,
       lastSuccessfulSendAt: new Date().toISOString(),
       lastError: undefined
     });
   } catch (error) {
     await spoolEvent(config.spoolDir, event);
     await updateState(config.statePath, {
-      lastPayloadCapturedAt: result.capturedAt,
+      lastPayloadCapturedAt: snapshot.observed_at,
       lastPayloadHash: hash,
-      lastSourceFile: result.sourceFile,
+      lastSuccessfulUsageAt: snapshot.status.ok ? snapshot.observed_at : state.lastSuccessfulUsageAt,
       lastError: (error as Error).message
     });
     throw error;
+  }
+}
+
+async function fileExists(file: string): Promise<boolean> {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -84,7 +108,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   if (process.argv.includes("--status")) {
     const state = await readState(config.statePath);
-    console.log(JSON.stringify({ provider: config.provider, node_id: config.nodeId, hostname: config.hostname, state }, null, 2));
+    console.log(JSON.stringify({ collector: config.collectorMode, provider: config.provider, node_id: config.nodeId, hostname: config.hostname, state }, null, 2));
     return;
   }
 
@@ -98,7 +122,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  logger.info("agent daemon started", { provider: config.provider, intervalSeconds: config.intervalSeconds });
+  logger.info("agent daemon started", { collector: config.collectorMode, outputModes: config.outputModes, intervalSeconds: config.intervalSeconds });
   for (;;) {
     try {
       await runOnce(config);

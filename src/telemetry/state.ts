@@ -6,6 +6,7 @@ export interface AgentState {
   lastPayloadHash?: string;
   lastSourceFile?: string;
   lastSuccessfulSendAt?: string;
+  lastSuccessfulUsageAt?: string;
   lastError?: string;
 }
 

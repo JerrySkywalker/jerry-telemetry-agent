@@ -2,12 +2,17 @@ import os from "node:os";
 
 export type AgentMode = "once" | "daemon";
 export type ProviderMode = "file" | "host-codex" | "container-codex";
+export type CollectorMode = "codex-backend-usage" | "codex-cli-status-fallback";
+export type OutputMode = "stdout" | "file" | "http";
 
 export interface Config {
   mode: AgentMode;
   dryRun: boolean;
   provider: ProviderMode;
+  outputModes: OutputMode[];
   intervalSeconds: number;
+  codexHome: string;
+  codexUsageEndpoint: string;
   codexStatusLatestPath: string;
   hostCodexBin: string;
   hostCodexHome: string;
@@ -18,6 +23,13 @@ export interface Config {
   hostname: string;
   region: string;
   collector: string;
+  collectorMode: CollectorMode;
+  accountLabel: string;
+  nodeRole: string;
+  platform: string;
+  outputFile: string;
+  usageLatestPath: string;
+  usageLastGoodPath: string;
   statePath: string;
   spoolDir: string;
   forceSend: boolean;
@@ -52,6 +64,21 @@ function provider(value: string | undefined): ProviderMode {
   throw new Error(`Invalid CODEX_PROVIDER: ${value ?? ""}`);
 }
 
+function collector(value: string | undefined): CollectorMode {
+  if (value === "codex-backend-usage" || value === "codex-cli-status-fallback") return value;
+  throw new Error(`Invalid collector mode: ${value ?? ""}`);
+}
+
+function outputModes(value: string | undefined): OutputMode[] {
+  const raw = value ?? "stdout";
+  const modes = raw.split(",").map((item) => item.trim()).filter(Boolean);
+  const valid = new Set(["stdout", "file", "http"]);
+  for (const mode of modes) {
+    if (!valid.has(mode)) throw new Error(`Invalid TELEMETRY_OUTPUT_MODE: ${mode}`);
+  }
+  return [...new Set(modes)] as OutputMode[];
+}
+
 function mode(value: string | undefined): AgentMode {
   if (value === "once" || value === "daemon") return value;
   throw new Error(`Invalid AGENT_MODE: ${value ?? ""}`);
@@ -59,13 +86,23 @@ function mode(value: string | undefined): AgentMode {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.argv.slice(2)): Config {
   const cliProvider = readFlag(args, "--provider");
+  const cliCollector = readFlag(args, "--collector");
   const cliMode = hasFlag(args, "--once") ? "once" : hasFlag(args, "--daemon") ? "daemon" : undefined;
+  const collectorMode = collector(
+    cliCollector ??
+      env.TELEMETRY_COLLECTOR_MODE ??
+      (bool(env.TELEMETRY_ENABLE_TMUX_FALLBACK, false) ? "codex-cli-status-fallback" : "codex-backend-usage")
+  );
+  const statePath = env.STATE_PATH ?? "/state/agent-state.json";
 
   return {
     mode: mode(cliMode ?? env.AGENT_MODE ?? "daemon"),
     dryRun: hasFlag(args, "--dry-run") || bool(env.DRY_RUN, false),
     provider: provider(cliProvider ?? env.CODEX_PROVIDER ?? "file"),
-    intervalSeconds: int(env.AGENT_INTERVAL_SECONDS, 600),
+    outputModes: outputModes(env.TELEMETRY_OUTPUT_MODE),
+    intervalSeconds: int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300),
+    codexHome: env.CODEX_HOME ?? `${os.homedir()}/.codex`,
+    codexUsageEndpoint: env.CODEX_USAGE_ENDPOINT ?? "https://chatgpt.com/backend-api/wham/usage",
     codexStatusLatestPath: env.CODEX_STATUS_LATEST_PATH ?? "/input/latest.json",
     hostCodexBin: env.HOST_CODEX_BIN ?? "/host-bin/codex",
     hostCodexHome: env.HOST_CODEX_HOME ?? "/host-codex-home",
@@ -75,8 +112,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     nodeSecret: env.TELEMETRY_NODE_SECRET ?? "",
     hostname: env.TELEMETRY_HOSTNAME ?? os.hostname(),
     region: env.TELEMETRY_REGION ?? "",
-    collector: env.TELEMETRY_COLLECTOR ?? "codex-status",
-    statePath: env.STATE_PATH ?? "/state/agent-state.json",
+    collector: env.TELEMETRY_COLLECTOR ?? collectorMode,
+    collectorMode,
+    accountLabel: env.TELEMETRY_ACCOUNT_LABEL ?? "",
+    nodeRole: env.TELEMETRY_NODE_ROLE ?? "",
+    platform: process.platform,
+    outputFile: env.TELEMETRY_OUTPUT_FILE ?? "/state/codex-usage-latest.safe.snapshot.json",
+    usageLatestPath: env.CODEX_USAGE_LATEST_PATH ?? "/state/codex-usage-latest.safe.snapshot.json",
+    usageLastGoodPath: env.CODEX_USAGE_LAST_GOOD_PATH ?? "/state/codex-usage-last-good.safe.snapshot.json",
+    statePath,
     spoolDir: env.SPOOL_DIR ?? "/state/spool",
     forceSend: bool(env.FORCE_SEND, false),
     healthServerEnabled: bool(env.HEALTH_SERVER_ENABLED, false),
