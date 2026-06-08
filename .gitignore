@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+state/
+spool/
+tmp/
+coverage/
+*.log
+
+# Local Codex usage probes / secrets
+*.raw.local-only.json
+*.safe.snapshot.json
+codex-usage-test/
+.env
+.env.*
+*.local.env
+auth.json

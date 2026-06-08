@@ -1,0 +1,24 @@
+{
+  "name": "jerry-telemetry-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node-side telemetry agent for Jerry telemetry hub.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/main.js",
+    "dev": "tsx src/main.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.8"
+  }
+}

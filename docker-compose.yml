@@ -1,0 +1,32 @@
+services:
+  jerry-telemetry-agent:
+    build: .
+    image: jerry-telemetry-agent:local
+    environment:
+      AGENT_MODE: ${AGENT_MODE:-daemon}
+      CODEX_PROVIDER: ${CODEX_PROVIDER:-file}
+      CODEX_STATUS_LATEST_PATH: ${CODEX_STATUS_LATEST_PATH:-/input/latest.json}
+      STATE_PATH: ${STATE_PATH:-/state/agent-state.json}
+      SPOOL_DIR: ${SPOOL_DIR:-/state/spool}
+      HEALTH_SERVER_ENABLED: ${HEALTH_SERVER_ENABLED:-true}
+      HEALTH_HOST: 0.0.0.0
+      HEALTH_PORT: ${HEALTH_PORT:-8081}
+      TELEMETRY_HUB_URL: ${TELEMETRY_HUB_URL:-}
+      TELEMETRY_NODE_ID: ${TELEMETRY_NODE_ID:-}
+      TELEMETRY_NODE_SECRET: ${TELEMETRY_NODE_SECRET:-}
+      TELEMETRY_HOSTNAME: ${TELEMETRY_HOSTNAME:-}
+      TELEMETRY_REGION: ${TELEMETRY_REGION:-}
+      TELEMETRY_COLLECTOR: ${TELEMETRY_COLLECTOR:-codex-status}
+      FORCE_SEND: ${FORCE_SEND:-false}
+      HOST_CODEX_BIN: ${HOST_CODEX_BIN:-/host-bin/codex}
+      HOST_CODEX_HOME: ${HOST_CODEX_HOME:-/host-codex-home}
+      CODEX_TMUX_SESSION: ${CODEX_TMUX_SESSION:-codex-status-agent}
+    volumes:
+      - ./fixtures:/input:ro
+      - ./state:/state
+      # host-codex examples:
+      # - /usr/local/bin/codex:/host-bin/codex:ro
+      # - ~/.codex:/host-codex-home:ro
+    ports:
+      - "127.0.0.1:${HEALTH_PORT:-8081}:8081"
+    restart: unless-stopped

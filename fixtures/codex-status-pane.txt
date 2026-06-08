@@ -1,0 +1,7 @@
+Codex status
+Provider: codex
+Status: ok
+Model: gpt-5
+Account: acct_example_private
+Session: sess_example_private
+Token usage: input=123 output=45

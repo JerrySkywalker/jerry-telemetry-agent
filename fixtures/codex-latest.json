@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-06-08T07:00:00.000Z",
+  "provider": "codex",
+  "status": "ok",
+  "model": "gpt-5",
+  "cwd": "/workspace",
+  "account_id": "[REDACTED]",
+  "session_id": "[REDACTED]",
+  "token_usage": {
+    "input": 123,
+    "output": 45
+  }
+}
