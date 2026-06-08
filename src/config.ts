@@ -1,7 +1,7 @@
 import os from "node:os";
 
 export type AgentMode = "once" | "daemon";
-export type ProviderMode = "file" | "host-codex" | "container-codex";
+export type ProviderMode = "backend-usage" | "file" | "host-codex" | "container-codex";
 export type CollectorMode = "codex-backend-usage" | "codex-cli-status-fallback";
 export type OutputMode = "stdout" | "file" | "http";
 
@@ -60,7 +60,7 @@ function hasFlag(args: string[], name: string): boolean {
 }
 
 function provider(value: string | undefined): ProviderMode {
-  if (value === "file" || value === "host-codex" || value === "container-codex") return value;
+  if (value === "backend-usage" || value === "file" || value === "host-codex" || value === "container-codex") return value;
   throw new Error(`Invalid CODEX_PROVIDER: ${value ?? ""}`);
 }
 
@@ -98,7 +98,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
   return {
     mode: mode(cliMode ?? env.AGENT_MODE ?? "daemon"),
     dryRun: hasFlag(args, "--dry-run") || bool(env.DRY_RUN, false),
-    provider: provider(cliProvider ?? env.CODEX_PROVIDER ?? "file"),
+    provider: provider(cliProvider ?? env.CODEX_PROVIDER ?? "backend-usage"),
     outputModes: outputModes(env.TELEMETRY_OUTPUT_MODE),
     intervalSeconds: int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300),
     codexHome: env.CODEX_HOME ?? `${os.homedir()}/.codex`,

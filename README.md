@@ -29,12 +29,20 @@ $env:TELEMETRY_NODE_ID="local-dev"
 npm run dev -- --once
 ```
 
+For a local backend usage smoke that writes only a safe file and does not upload:
+
+```powershell
+scripts/smoke-codex-backend-usage-local.ps1
+```
+
 For migration fallback file mode:
 
 ```powershell
 $env:CODEX_STATUS_LATEST_PATH="fixtures/latest.json"
 npm run dev -- --once --collector codex-cli-status-fallback --provider file
 ```
+
+For LAX Docker backend usage mode, the host prerequisites are Docker and an installed/authenticated Codex CLI. The container mounts the host Codex auth directory read-only; it must not bake `auth.json` into the image. See [docs/LAX_BACKEND_USAGE_DOCKER_MIGRATION.md](docs/LAX_BACKEND_USAGE_DOCKER_MIGRATION.md).
 
 Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_SECRET`, access tokens, refresh tokens, raw `auth.json`, or raw backend usage responses.
 

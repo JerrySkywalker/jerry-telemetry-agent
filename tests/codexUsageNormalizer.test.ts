@@ -46,7 +46,11 @@ describe("Codex usage normalizer", () => {
     const snapshot = normalizeCodexUsage(raw, testConfig());
     expect(JSON.stringify(snapshot)).not.toContain("do-not-emit");
     expect(JSON.stringify(snapshot)).not.toContain("acct_123");
-    expect(snapshot.raw_omitted_keys).toEqual(["account_id", "email", "promo", "referral_beacon"]);
+    expect(JSON.stringify(snapshot)).not.toContain("account_id");
+    expect(JSON.stringify(snapshot)).not.toContain("email");
+    expect(JSON.stringify(snapshot)).not.toContain("referral_beacon");
+    expect(JSON.stringify(snapshot)).not.toContain("promo");
+    expect(snapshot.raw_omitted_keys).toEqual(["sensitive_raw_fields"]);
   });
 
   it("creates error snapshots", () => {

@@ -16,3 +16,5 @@ Enable the health server to expose dashboard-friendly JSON:
 - `last_success_at`
 
 Glance should read these endpoints or the safe snapshot file. It must not parse raw backend responses.
+
+For backend usage, the safe snapshot type is `codex.usage.snapshot`. The default limit appears in `limits` with `scope=default`; model-specific limits, including GPT-5.3-Codex-Spark when present, appear as additional limits.

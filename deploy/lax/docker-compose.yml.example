@@ -1,0 +1,34 @@
+services:
+  jerry-telemetry-agent:
+    image: jerry-telemetry-agent:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AGENT_MODE: ${AGENT_MODE:-daemon}
+      CODEX_USAGE_POLL_INTERVAL_SECONDS: ${CODEX_USAGE_POLL_INTERVAL_SECONDS:-300}
+      TELEMETRY_COLLECTOR: ${TELEMETRY_COLLECTOR:-codex-backend-usage}
+      TELEMETRY_COLLECTOR_MODE: ${TELEMETRY_COLLECTOR_MODE:-codex-backend-usage}
+      CODEX_PROVIDER: ${CODEX_PROVIDER:-backend-usage}
+      CODEX_HOME: ${CODEX_HOME:-/host-codex-home}
+      CODEX_USAGE_ENDPOINT: ${CODEX_USAGE_ENDPOINT:-https://chatgpt.com/backend-api/wham/usage}
+      TELEMETRY_OUTPUT_MODE: ${TELEMETRY_OUTPUT_MODE:-file,http}
+      TELEMETRY_OUTPUT_FILE: ${TELEMETRY_OUTPUT_FILE:-/state/codex-usage-latest.safe.snapshot.json}
+      CODEX_USAGE_LATEST_PATH: ${CODEX_USAGE_LATEST_PATH:-/state/codex-usage-latest.safe.snapshot.json}
+      CODEX_USAGE_LAST_GOOD_PATH: ${CODEX_USAGE_LAST_GOOD_PATH:-/state/codex-usage-last-good.safe.snapshot.json}
+      STATE_PATH: ${STATE_PATH:-/state/agent-state.json}
+      SPOOL_DIR: ${SPOOL_DIR:-/state/spool}
+      HEALTH_SERVER_ENABLED: ${HEALTH_SERVER_ENABLED:-true}
+      HEALTH_HOST: 0.0.0.0
+      HEALTH_PORT: ${HEALTH_PORT:-8081}
+      TELEMETRY_HUB_URL: ${TELEMETRY_HUB_URL:-https://telemetry.jerryskywalker.space/v1/events}
+      TELEMETRY_NODE_ID: ${TELEMETRY_NODE_ID:-us-lax-pro-01}
+      TELEMETRY_NODE_SECRET: ${TELEMETRY_NODE_SECRET}
+      TELEMETRY_HOSTNAME: ${TELEMETRY_HOSTNAME:-novix-lax-01}
+      TELEMETRY_REGION: ${TELEMETRY_REGION:-us-lax}
+      TELEMETRY_ENABLE_TMUX_FALLBACK: "false"
+    volumes:
+      - /home/ubuntu/.codex:/host-codex-home:ro
+      - ./state:/state
+    ports:
+      - "127.0.0.1:18081:8081"

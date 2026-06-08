@@ -35,3 +35,19 @@ Commit or stash local changes before running `scripts/pr-ready-check.ps1`. The c
 ## Light secret scan fails
 
 Remove forbidden local files such as `.env`, `auth.json`, or raw usage dumps from the repository tree. If the scanner reports a possible token assignment, replace the value with an example placeholder or move the secret to local environment configuration.
+
+## LAX preflight reports missing Codex auth
+
+Run or re-authenticate Codex CLI on the LAX host. Do not copy local `auth.json` into the repository or bake it into Docker.
+
+For LAX Docker mode, mount `/home/ubuntu/.codex:/host-codex-home:ro` and set `CODEX_HOME=/host-codex-home`.
+
+## Local backend smoke fails
+
+Run:
+
+```powershell
+scripts/smoke-codex-backend-usage-local.ps1
+```
+
+The script checks local Codex auth, runs once in file-only mode, and validates that the safe snapshot does not contain forbidden token or identity markers.

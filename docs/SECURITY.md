@@ -16,3 +16,9 @@
 - Use `.env.example` for documented configuration names only.
 - Run `scripts/scan-secrets-light.ps1` before opening or updating PRs. This is a lightweight guardrail for obvious mistakes, not a full secret scanner.
 - GitHub Actions must not contain production secrets or deploy to production in the current CI-only phase.
+
+## LAX Docker Guardrails
+
+- LAX Docker backend usage mode mounts the host Codex directory read-only.
+- The Docker image must not contain `auth.json` or any copied Codex credential material.
+- Local smoke scripts write only normalized safe snapshots and must not upload to the telemetry hub.

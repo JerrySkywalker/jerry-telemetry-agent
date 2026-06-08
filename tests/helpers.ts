@@ -11,7 +11,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
   return {
     mode: "once",
     dryRun: false,
-    provider: "file",
+    provider: "backend-usage",
     outputModes: ["stdout"],
     intervalSeconds: 600,
     codexHome: "/home/test/.codex",
