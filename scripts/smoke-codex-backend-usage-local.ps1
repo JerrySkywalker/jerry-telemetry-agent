@@ -78,17 +78,58 @@ function Assert-NoForbiddenMarker {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
 $authPath = Join-Path $codexHome "auth.json"
+$endpoint = if ($env:CODEX_USAGE_ENDPOINT) { $env:CODEX_USAGE_ENDPOINT } else { "https://chatgpt.com/backend-api/wham/usage" }
+$authFileExists = Test-Path -LiteralPath $authPath -PathType Leaf
+$authFileLength = 0
+$authMode = ""
+$hasAccessToken = $false
 
-if (-not (Test-Path -LiteralPath $authPath -PathType Leaf)) {
+if (-not $authFileExists) {
+  Write-Host "auth_file_exists=False"
+  Write-Host "auth_file_length=0"
+  Write-Host "auth_mode="
+  Write-Host "has_access_token=False"
+  Write-Host "endpoint=$endpoint"
   throw "Codex auth.json was not found. Set CODEX_HOME or authenticate Codex CLI locally."
 }
 
+function Get-OptionalProperty {
+  param(
+    [object]$Value,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Name
+  )
+
+  if ($null -eq $Value) {
+    return ""
+  }
+
+  $property = $Value.PSObject.Properties[$Name]
+  if ($null -eq $property) {
+    return ""
+  }
+
+  return $property.Value
+}
+
+$authFileLength = (Get-Item -LiteralPath $authPath).Length
 $auth = Get-Content -Raw -LiteralPath $authPath | ConvertFrom-Json
+$authModeValue = Find-JsonProperty -Value $auth -Name "auth_mode"
+if ($authModeValue -is [string]) {
+  $authMode = $authModeValue
+}
 $accessTokenKey = ("access" + "_token")
 $accessToken = Find-JsonProperty -Value $auth -Name $accessTokenKey
 if (-not ($accessToken -is [string]) -or $accessToken.Length -eq 0) {
+  Write-Host "auth_file_exists=True"
+  Write-Host "auth_file_length=$authFileLength"
+  Write-Host "auth_mode=$authMode"
+  Write-Host "has_access_token=False"
+  Write-Host "endpoint=$endpoint"
   throw "Codex auth.json does not contain an access token."
 }
+$hasAccessToken = $true
 
 $outputRoot = Join-Path $repoRoot $OutputDir
 $snapshotPath = Join-Path $outputRoot "codex-usage-latest.safe.snapshot.json"
@@ -153,22 +194,32 @@ try {
   if ($null -eq $snapshot.node -or -not $snapshot.node.id) { throw "Smoke snapshot is missing node.id." }
 
   $limits = @($snapshot.limits)
+  $defaultLimit = @($limits | Where-Object { $_.scope -eq "default" -or $_.name -eq "default" })
+  $sparkLimit = @($limits | Where-Object { $_.name -eq "GPT-5.3-Codex-Spark" })
   if ($limits.Count -gt 0) {
-    $defaultLimit = @($limits | Where-Object { $_.scope -eq "default" -or $_.name -eq "default" })
     if ($defaultLimit.Count -eq 0) {
       throw "Smoke snapshot has limits but no default limit."
     }
 
-    $sparkLimit = @($limits | Where-Object { $_.name -eq "GPT-5.3-Codex-Spark" })
     if ($snapshotText.Contains("GPT-5.3-Codex-Spark") -and $sparkLimit.Count -eq 0) {
       throw "Smoke snapshot mentions GPT-5.3-Codex-Spark outside limits."
     }
   }
 
-  Write-Host "Backend usage smoke completed."
-  Write-Host "snapshot_path=$snapshotPath"
+  $rawOmittedKeys = if ($snapshot.raw_omitted_keys) { (@($snapshot.raw_omitted_keys) -join ",") } else { "" }
+  Write-Host "auth_file_exists=$authFileExists"
+  Write-Host "auth_file_length=$authFileLength"
+  Write-Host "auth_mode=$authMode"
+  Write-Host "has_access_token=$hasAccessToken"
+  Write-Host "endpoint=$endpoint"
+  Write-Host "output_snapshot_path=$snapshotPath"
   Write-Host "status_ok=$($snapshot.status.ok)"
+  Write-Host "error_code=$(Get-OptionalProperty -Value $snapshot.status -Name "error_code")"
+  Write-Host "message=$(Get-OptionalProperty -Value $snapshot.status -Name "message")"
   Write-Host "limits_count=$($limits.Count)"
+  Write-Host "default_limit_found=$($defaultLimit.Count -gt 0)"
+  Write-Host "spark_limit_found=$($sparkLimit.Count -gt 0)"
+  Write-Host "raw_omitted_keys=$rawOmittedKeys"
   Write-Host "observed_at=$($snapshot.observed_at)"
   Write-Host "node_id=$($snapshot.node.id)"
 } finally {

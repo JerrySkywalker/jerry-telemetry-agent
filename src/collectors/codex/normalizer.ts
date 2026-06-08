@@ -47,7 +47,8 @@ export function errorSnapshot(
   errorCode: CodexUsageErrorCode,
   message: string,
   observedAt = new Date().toISOString(),
-  stale = false
+  stale = false,
+  diagnostics: { httpStatus?: number } = {}
 ): CodexUsageSnapshot {
   return {
     type: "codex.usage.snapshot",
@@ -65,7 +66,8 @@ export function errorSnapshot(
       ok: false,
       error_code: errorCode,
       message,
-      stale
+      stale,
+      http_status: diagnostics.httpStatus
     },
     limits: [],
     raw_omitted_keys: []
@@ -134,7 +136,7 @@ function normalizeLimit(value: unknown, scope: "default" | "additional", fallbac
   const resetAt = numberValue(record.reset_at);
   return {
     scope,
-    name: stringValue(record.limit_name) ?? fallbackName ?? "additional",
+    name: stringValue(record.limit_name) ?? stringValue(record.name) ?? stringValue(record.model_slug) ?? fallbackName ?? "additional",
     metered_feature: stringValue(record.metered_feature),
     used_percent: used,
     remaining_percent: used === undefined ? undefined : Math.max(0, 100 - used),

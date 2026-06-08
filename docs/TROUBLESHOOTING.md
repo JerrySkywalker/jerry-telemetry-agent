@@ -8,6 +8,8 @@ Mount or set `CODEX_HOME` so the container can read the local Codex `auth.json`.
 
 Run or re-authenticate Codex CLI on the host. The agent does not refresh OAuth tokens.
 
+Current Codex ChatGPT auth stores the backend token under `tokens.access_token`. The local smoke script reports only `has_access_token=True/False`; it must not print the token value or raw `auth.json`.
+
 ## backend usage returns HTTP 403
 
 Confirm `CODEX_USAGE_ENDPOINT` is `https://chatgpt.com/backend-api/wham/usage`. The older `https://chatgpt.com/backend-api/codex/usage` endpoint is not the primary endpoint and has been observed returning 403.
@@ -51,3 +53,7 @@ scripts/smoke-codex-backend-usage-local.ps1
 ```
 
 The script checks local Codex auth, runs once in file-only mode, and validates that the safe snapshot does not contain forbidden token or identity markers.
+
+Expected success diagnostics include `status_ok=True`, `limits_count` greater than zero, `default_limit_found=True` when the default limit is present, and `spark_limit_found=True` when GPT-5.3-Codex-Spark is present.
+
+If the script reports an HTTP error, use the safe `error_code`, `message`, and `http_status` in the snapshot. Do not inspect or paste token values.

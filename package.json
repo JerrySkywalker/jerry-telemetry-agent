@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
+    "smoke:codex-backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-codex-backend-usage-local.ps1",
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts"
   },

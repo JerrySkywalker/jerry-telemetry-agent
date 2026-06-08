@@ -43,6 +43,7 @@ export interface CodexUsageSnapshot {
     error_code?: CodexUsageErrorCode | string;
     message?: string;
     stale?: boolean;
+    http_status?: number;
   };
   limits: CodexRateLimit[];
   credits?: {

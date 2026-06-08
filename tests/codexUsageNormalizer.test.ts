@@ -7,7 +7,7 @@ describe("Codex usage normalizer", () => {
     plan_type: "pro",
     rate_limit_reached_type: null,
     rate_limit: { used_percent: 35, limit_window_seconds: 300, reset_at: 1780862400 },
-    additional_rate_limits: [{ limit_name: "cloud", metered_feature: "cloud_tasks", used_percent: 80, reset_at: 1780866000 }],
+    additional_rate_limits: [{ limit_name: "GPT-5.3-Codex-Spark", metered_feature: "cloud_tasks", used_percent: 80, reset_at: 1780866000 }],
     credits: { has_credits: true, unlimited: false, overage_limit_reached: false, balance: "10.00" },
     spend_control: { reached: false, individual_limit: null },
     email: "do-not-emit@example.com",
@@ -31,11 +31,11 @@ describe("Codex usage normalizer", () => {
     });
   });
 
-  it("maps additional_rate_limits", () => {
+  it("maps additional GPT-5.3-Codex-Spark rate limit", () => {
     const snapshot = normalizeCodexUsage(raw, testConfig());
     expect(snapshot.limits[1]).toMatchObject({
       scope: "additional",
-      name: "cloud",
+      name: "GPT-5.3-Codex-Spark",
       metered_feature: "cloud_tasks",
       used_percent: 80,
       remaining_percent: 20
@@ -48,6 +48,8 @@ describe("Codex usage normalizer", () => {
     expect(JSON.stringify(snapshot)).not.toContain("acct_123");
     expect(JSON.stringify(snapshot)).not.toContain("account_id");
     expect(JSON.stringify(snapshot)).not.toContain("email");
+    expect(JSON.stringify(normalizeCodexUsage({ ...raw, access_token: "hidden", refresh_token: "hidden" }, testConfig()))).not.toContain("access_token");
+    expect(JSON.stringify(normalizeCodexUsage({ ...raw, access_token: "hidden", refresh_token: "hidden" }, testConfig()))).not.toContain("refresh_token");
     expect(JSON.stringify(snapshot)).not.toContain("referral_beacon");
     expect(JSON.stringify(snapshot)).not.toContain("promo");
     expect(snapshot.raw_omitted_keys).toEqual(["sensitive_raw_fields"]);
@@ -70,7 +72,7 @@ describe("Codex usage normalizer", () => {
         primary: { used_percent: 35, remaining_percent: 65 },
         reset_at_iso: "2026-06-07T20:00:00.000Z"
       },
-      additional_limits: [{ name: "cloud" }],
+      additional_limits: [{ name: "GPT-5.3-Codex-Spark" }],
       last_success_at: "2026-06-08T00:00:00.000Z"
     });
   });

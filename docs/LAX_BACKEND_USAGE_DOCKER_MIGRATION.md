@@ -12,7 +12,9 @@ This is preparation documentation only. Do not deploy to LAX, stop the current s
 - `CODEX_HOME=/host-codex-home`
 - `CODEX_USAGE_ENDPOINT=https://chatgpt.com/backend-api/wham/usage`
 
-Host prerequisites are Docker and an installed/authenticated Codex CLI. The container must mount `/home/ubuntu/.codex:/host-codex-home:ro`; it must not bake Codex auth into the image.
+Backend usage is the primary migration path. Host prerequisites are only Docker plus an installed/authenticated Codex CLI. The container must mount `/home/ubuntu/.codex:/host-codex-home:ro`; it must not bake Codex auth into the image.
+
+The existing LAX production timer remains unchanged until explicit manual approval. Do not stop, disable, or replace it during preflight or dry-run work.
 
 ## Preflight
 
@@ -20,7 +22,7 @@ Host prerequisites are Docker and an installed/authenticated Codex CLI. The cont
 scripts/lax-backend-usage-preflight.ps1
 ```
 
-The preflight checks Docker, Docker Compose, host Codex, host Codex auth presence, old timer status, hub latest endpoint status, disk, memory, and whether `~/jerry-telemetry-agent` exists. It prints only redacted status.
+The preflight checks SSH, Docker, Docker Compose, host Codex, host `~/.codex/auth.json`, whether the auth file contains `tokens.access_token`, old timer status, hub health and latest endpoints, disk, memory, and whether `~/jerry-telemetry-agent` exists. It prints only redacted status.
 
 ## Compose Template
 
@@ -48,6 +50,12 @@ Local Windows smoke, no upload:
 
 ```powershell
 scripts/smoke-codex-backend-usage-local.ps1
+```
+
+Equivalent npm command:
+
+```powershell
+npm run smoke:codex-backend
 ```
 
 Backend once, stdout only, no upload:

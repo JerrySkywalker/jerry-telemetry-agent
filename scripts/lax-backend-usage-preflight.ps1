@@ -1,6 +1,8 @@
 param(
   [string]$SshHost = "lax",
-  [string]$TelemetryLatestUrl = "https://telemetry.jerryskywalker.space/latest"
+  [string]$TelemetryHealthzUrl = "https://telemetry.jerryskywalker.space/healthz",
+  [string]$TelemetryLatestUrl = "https://telemetry.jerryskywalker.space/latest",
+  [string]$TelemetryCodexStatusUrl = "https://telemetry.jerryskywalker.space/latest/codex.status"
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,19 +39,19 @@ fi
 
 auth="$HOME/.codex/auth.json"
 if [ -f "$auth" ]; then
-  print_check codex_config_json "present"
+  print_check codex_auth_json "present"
   token_key='access''_token'
-  if grep -q "\"$token_key\"[[:space:]]*:" "$auth"; then
-    print_check codex_backend_token "present"
+  if grep -q '"tokens"[[:space:]]*:' "$auth" && grep -q "\"$token_key\"[[:space:]]*:" "$auth"; then
+    print_check codex_tokens_access_token "present"
   else
-    print_check codex_backend_token "missing"
+    print_check codex_tokens_access_token "missing"
   fi
 else
-  print_check codex_config_json "missing"
-  print_check codex_backend_token "missing"
+  print_check codex_auth_json "missing"
+  print_check codex_tokens_access_token "missing"
 fi
 
-for unit in capture-status.timer send-latest.timer jerry-telemetry-agent.timer; do
+for unit in codex-status-telemetry.timer capture-status.timer send-latest.timer jerry-telemetry-agent.timer; do
   if systemctl list-unit-files "$unit" >/dev/null 2>&1; then
     print_check "systemd_$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)/$(systemctl is-enabled "$unit" 2>/dev/null || true)"
   else
@@ -58,14 +60,30 @@ for unit in capture-status.timer send-latest.timer jerry-telemetry-agent.timer; 
 done
 
 if command -v curl >/dev/null 2>&1; then
+  health_code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 10 "$TELEMETRY_HEALTHZ_URL" 2>/dev/null || true)"
+  if [ -n "$health_code" ]; then
+    print_check telemetry_healthz_http_status "$health_code"
+  else
+    print_check telemetry_healthz_http_status "unreachable"
+  fi
+
   code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 10 "$TELEMETRY_LATEST_URL" 2>/dev/null || true)"
   if [ -n "$code" ]; then
     print_check telemetry_latest_http_status "$code"
   else
     print_check telemetry_latest_http_status "unreachable"
   fi
+
+  codex_status_code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 10 "$TELEMETRY_CODEX_STATUS_URL" 2>/dev/null || true)"
+  if [ -n "$codex_status_code" ]; then
+    print_check telemetry_codex_status_http_status "$codex_status_code"
+  else
+    print_check telemetry_codex_status_http_status "unreachable"
+  fi
 else
+  print_check telemetry_healthz_http_status "curl-missing"
   print_check telemetry_latest_http_status "curl-missing"
+  print_check telemetry_codex_status_http_status "curl-missing"
 fi
 
 print_check disk_root "$(df -h / | awk 'NR==2 {print "size="$2",used="$3",avail="$4",pct="$5}')"
@@ -79,4 +97,4 @@ fi
 '@
 
 $encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
-ssh $SshHost "TELEMETRY_LATEST_URL='$TelemetryLatestUrl' bash -lc 'echo $encodedScript | base64 -d | bash'"
+ssh $SshHost "TELEMETRY_HEALTHZ_URL='$TelemetryHealthzUrl' TELEMETRY_LATEST_URL='$TelemetryLatestUrl' TELEMETRY_CODEX_STATUS_URL='$TelemetryCodexStatusUrl' bash -lc 'echo $encodedScript | base64 -d | bash'"

@@ -7,13 +7,12 @@ spool/
 tmp/
 coverage/
 *.log
+.smoke/
 
 # Local Codex usage probes / secrets
 *.raw.local-only.json
 *.safe.snapshot.json
 codex-usage-test/
-.env
-.env.*
 *.local.env
 auth.json
 !deploy/**/.env.example
