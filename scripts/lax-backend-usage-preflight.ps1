@@ -1,8 +1,8 @@
 param(
   [string]$SshHost = "lax",
   [string]$TelemetryHealthzUrl = "https://telemetry.jerryskywalker.space/healthz",
-  [string]$TelemetryLatestUrl = "https://telemetry.jerryskywalker.space/latest",
-  [string]$TelemetryCodexStatusUrl = "https://telemetry.jerryskywalker.space/latest/codex.status"
+  [string]$TelemetryLatestUrl = "https://telemetry.jerryskywalker.space/v1/events/latest",
+  [string]$TelemetryCodexStatusUrl = "https://telemetry.jerryskywalker.space/v1/events/latest/codex.status"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,6 +16,8 @@ print_check() {
   value="$2"
   printf '%s=%s\n' "$name" "$value"
 }
+
+print_check ssh "ok"
 
 if command -v docker >/dev/null 2>&1; then
   print_check docker "$(docker --version 2>/dev/null | sed 's/[[:space:]]\+/ /g')"
@@ -96,5 +98,5 @@ else
 fi
 '@
 
-$encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
-ssh $SshHost "TELEMETRY_HEALTHZ_URL='$TelemetryHealthzUrl' TELEMETRY_LATEST_URL='$TelemetryLatestUrl' TELEMETRY_CODEX_STATUS_URL='$TelemetryCodexStatusUrl' bash -lc 'echo $encodedScript | base64 -d | bash'"
+$encodedScript = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($remoteScript -replace "`r`n", "`n")))
+ssh $SshHost "TELEMETRY_HEALTHZ_URL='$TelemetryHealthzUrl' TELEMETRY_LATEST_URL='$TelemetryLatestUrl' TELEMETRY_CODEX_STATUS_URL='$TelemetryCodexStatusUrl' bash -lc 'set -o pipefail; echo $encodedScript | base64 -d | bash'"

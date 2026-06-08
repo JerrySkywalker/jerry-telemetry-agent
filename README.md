@@ -44,6 +44,15 @@ npm run dev -- --once --collector codex-cli-status-fallback --provider file
 
 For LAX Docker backend usage mode, the host prerequisites are Docker and an installed/authenticated Codex CLI. The container mounts the host Codex auth directory read-only; it must not bake `auth.json` into the image. See [docs/LAX_BACKEND_USAGE_DOCKER_MIGRATION.md](docs/LAX_BACKEND_USAGE_DOCKER_MIGRATION.md).
 
+LAX preparation commands:
+
+```powershell
+scripts/lax-backend-usage-preflight.ps1
+scripts/lax-agent-dry-run.ps1
+```
+
+The dry-run copies the current committed tree to `~/jerry-telemetry-agent`, creates a non-secret `.env`, runs `docker compose config`, and runs backend usage once with `stdout,file` only. It does not upload to the hub, enable daemon mode, or touch the existing `codex-status-telemetry.timer`.
+
 Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_SECRET`, access tokens, refresh tokens, raw `auth.json`, or raw backend usage responses.
 
 ## Development Workflow
