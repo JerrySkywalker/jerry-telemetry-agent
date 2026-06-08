@@ -8,3 +8,11 @@
 - Payloads that still contain unredacted account or session identifiers are rejected.
 - HTTP output sends only the normalized `codex.usage.snapshot` inside the hub envelope.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.
+
+## Repository Guardrails
+
+- Do not commit `.env`, `.env.*`, `auth.json`, local raw usage dumps, or real telemetry secrets.
+- Do not commit `access_token`, `refresh_token`, email, account ID, or user ID values in snapshots.
+- Use `.env.example` for documented configuration names only.
+- Run `scripts/scan-secrets-light.ps1` before opening or updating PRs. This is a lightweight guardrail for obvious mistakes, not a full secret scanner.
+- GitHub Actions must not contain production secrets or deploy to production in the current CI-only phase.
