@@ -25,7 +25,15 @@ function Invoke-Step {
     return $null
   }
 
-  return & $Action
+  $global:LASTEXITCODE = 0
+  $output = & $Action
+  $exitCode = $LASTEXITCODE
+  if ($null -ne $output) {
+    $output
+  }
+  if ($exitCode -ne 0) {
+    throw "Step failed: $Description exited with code $exitCode"
+  }
 }
 
 function Assert-Command {
