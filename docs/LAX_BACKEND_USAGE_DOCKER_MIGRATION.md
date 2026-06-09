@@ -161,7 +161,162 @@ Hub comparison after upload:
 
 No daemon mode was enabled, no production hub settings were changed, and no old sender files were deleted.
 
-## Rollback / No-Op
+## Daemon Canary
+
+Goal 008 enables the Dockerized backend usage collector as a controlled daemon canary. This is the first daemon run for the new Docker agent and is the only allowed production-host change for the goal.
+
+Start the daemon from the local repository:
+
+```powershell
+scripts/lax-agent-daemon-canary.ps1 -ConfirmProductionDaemonCanary
+```
+
+The script copies the committed tree to:
+
+```text
+~/jerry-telemetry-agent
+```
+
+It creates or refreshes:
+
+- `~/jerry-telemetry-agent/state`
+- `~/jerry-telemetry-agent/logs`
+- non-secret host `.env` files at `.env` and `deploy/lax/.env`
+- host-only `docker-compose.daemon.yml`
+
+The script sources the existing old sender env on LAX, maps `TELEMETRY_SECRET` to `TELEMETRY_NODE_SECRET` only inside the remote shell environment, and never writes the secret to the rendered `.env` files.
+
+Daemon settings:
+
+- `restart: unless-stopped`
+- `AGENT_MODE=daemon`
+- `TELEMETRY_OUTPUT_MODE=file,http`
+- `TELEMETRY_HUB_URL=https://telemetry.jerryskywalker.space/v1/events`
+- `TELEMETRY_NODE_ID=us-lax-pro-01`
+- `TELEMETRY_HOSTNAME=novix-lax-01`
+- `TELEMETRY_REGION=us-lax`
+- `TELEMETRY_COLLECTOR=codex-backend-usage`
+- `CODEX_PROVIDER=backend-usage`
+- `CODEX_HOME=/host-codex-home`
+- `CODEX_USAGE_ENDPOINT=https://chatgpt.com/backend-api/wham/usage`
+- `CODEX_USAGE_POLL_INTERVAL_SECONDS=300`
+- `HEALTH_SERVER_ENABLED=true`
+- `HEALTH_HOST=0.0.0.0`
+- `HEALTH_PORT=8081`
+
+Required mounts:
+
+```yaml
+volumes:
+  - /home/ubuntu/.codex:/host-codex-home:ro
+  - ../../state:/state
+```
+
+The container health port is exposed only on LAX localhost:
+
+```yaml
+ports:
+  - "127.0.0.1:18081:8081"
+```
+
+Manual start command on LAX:
+
+```bash
+cd ~/jerry-telemetry-agent
+set -a
+. ~/jerry-telemetry-codex-status/send-latest.env
+set +a
+export TELEMETRY_NODE_SECRET="$TELEMETRY_SECRET"
+docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml up -d --build
+```
+
+View daemon state:
+
+```bash
+cd ~/jerry-telemetry-agent
+docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml ps
+```
+
+View logs:
+
+```bash
+cd ~/jerry-telemetry-agent
+docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml logs --tail 100
+```
+
+Check health from LAX only:
+
+```bash
+curl -fsS http://127.0.0.1:18081/healthz
+```
+
+Inspect the latest safe snapshot:
+
+```bash
+cd ~/jerry-telemetry-agent
+node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync("state/codex-usage-latest.safe.snapshot.json","utf8")); console.log(JSON.stringify({type:s.type,node_id:s.node?.id,status_ok:s.status?.ok,limits_count:s.limits?.length,observed_at:s.observed_at}, null, 2));'
+```
+
+Verify hub latest:
+
+```bash
+curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+curl -fsS https://telemetry.jerryskywalker.space/v1/nodes/us-lax-pro-01/latest
+```
+
+Observe two poll cycles:
+
+```bash
+curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+sleep 310
+curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+```
+
+Compare `id`, `received_at`, payload `observed_at`, and `payload.status.ok`. `id`, `received_at`, and `observed_at` should advance when the backend usage payload changes or `FORCE_SEND=true` is used for a one-shot validation. During normal daemon operation, unchanged payloads may update the local safe snapshot without uploading a duplicate event.
+
+Stop the daemon:
+
+```bash
+cd ~/jerry-telemetry-agent
+docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml stop
+```
+
+Rollback the canary:
+
+```bash
+cd ~/jerry-telemetry-agent
+docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml down
+```
+
+The old `codex-status-telemetry.timer` remains untouched. Do not stop, enable, disable, or modify it as part of this daemon canary.
+
+## Daemon Canary Result
+
+Goal 008 started the Dockerized backend usage daemon on LAX with the `jerry-telemetry-agent` Compose project.
+
+Initial daemon verification:
+
+- `docker compose up -d --build` succeeded.
+- Compose service state was `Up` with `127.0.0.1:18081->8081/tcp`.
+- `curl http://127.0.0.1:18081/healthz` succeeded from LAX.
+- `state/codex-usage-latest.safe.snapshot.json` existed.
+- Snapshot `status.ok=true`.
+- Snapshot `limits_count=2`.
+- Log and state marker scan found no token or raw identity markers.
+- Hub latest `codex.usage.snapshot` advanced to event id `20`, received at `2026-06-09T08:17:49.145Z`, observed at `2026-06-09T08:17:48.475Z`.
+
+Two-cycle observation:
+
+- After at least two 300 second daemon poll intervals, hub latest advanced to event id `22`.
+- Event `22` was received at `2026-06-09T08:27:50.891Z`.
+- Event `22` was observed at `2026-06-09T08:27:50.332Z`.
+- `status.ok` remained `true`.
+- `limits_count` remained `2`.
+- Node latest also pointed at event id `22`.
+
+The old `codex-status-telemetry.timer` remained `disabled` and `inactive`.
+
+## Dry-Run / Once Rollback / No-Op
 
 There is nothing to roll back after the dry-run or once-upload because no daemon, timer, or systemd unit is enabled. Leave the old `codex.status` chain as-is.
 
