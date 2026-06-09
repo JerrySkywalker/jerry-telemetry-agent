@@ -5,6 +5,7 @@ dist/
 state/
 spool/
 tmp/
+logs/
 coverage/
 *.log
 .smoke/

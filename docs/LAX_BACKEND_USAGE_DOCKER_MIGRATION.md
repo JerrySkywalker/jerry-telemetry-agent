@@ -1,6 +1,6 @@
 # LAX Backend Usage Docker Migration
 
-This is preparation documentation only. Do not deploy to LAX, stop the current systemd timer, change production hub settings, or add production secrets without explicit manual approval.
+This is preparation and operations documentation. Do not stop the current systemd timer, change production hub settings, or add production secrets without explicit manual approval.
 
 ## Target
 
@@ -163,7 +163,34 @@ No daemon mode was enabled, no production hub settings were changed, and no old 
 
 ## Daemon Canary
 
-Goal 008 enables the Dockerized backend usage collector as a controlled daemon canary. This is the first daemon run for the new Docker agent and is the only allowed production-host change for the goal.
+Goal 008 enabled the Dockerized backend usage collector as a controlled daemon canary. Goal 009 hardens observation and operations around the already-running canary.
+
+Current canary state:
+
+- LAX Docker daemon canary is running.
+- `TELEMETRY_NODE_ID=us-lax-pro-01`
+- `TELEMETRY_HOSTNAME=novix-lax-01`
+- `TELEMETRY_COLLECTOR=codex-backend-usage`
+- `TELEMETRY_OUTPUT_MODE=file,http`
+- `CODEX_USAGE_POLL_INTERVAL_SECONDS=300`
+- Health is exposed only on LAX localhost: `127.0.0.1:18081->8081`.
+- The old `codex-status-telemetry.timer` should remain `disabled` and `inactive`.
+
+All LAX daemon Compose operations must pass the persisted env file explicitly:
+
+```bash
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml ps
+```
+
+This prevents `TELEMETRY_NODE_SECRET` unset warnings when Compose renders `docker-compose.daemon.yml`.
+
+The LAX files `.env` and `.env.bak.*` are secret files:
+
+- Do not print their contents.
+- Do not copy them into the repository.
+- Do not commit them.
+- Prefer mode `600`.
+- Status tooling may report existence, non-empty secret status, counts, and permission summaries only.
 
 Start the daemon from the local repository:
 
@@ -223,25 +250,21 @@ Manual start command on LAX:
 
 ```bash
 cd ~/jerry-telemetry-agent
-set -a
-. ~/jerry-telemetry-codex-status/send-latest.env
-set +a
-export TELEMETRY_NODE_SECRET="$TELEMETRY_SECRET"
-docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml up -d --build
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml up -d --build
 ```
 
 View daemon state:
 
 ```bash
 cd ~/jerry-telemetry-agent
-docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml ps
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml ps
 ```
 
 View logs:
 
 ```bash
 cd ~/jerry-telemetry-agent
-docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml logs --tail 100
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml logs --tail 100
 ```
 
 Check health from LAX only:
@@ -250,11 +273,19 @@ Check health from LAX only:
 curl -fsS http://127.0.0.1:18081/healthz
 ```
 
-Inspect the latest safe snapshot:
+Inspect the latest safe snapshot through the health endpoint when possible:
+
+```bash
+curl -fsS http://127.0.0.1:18081/api/codex/usage/summary
+```
+
+If host reads of `state/codex-usage-latest.safe.snapshot.json` fail with `PermissionError`, do not treat that as daemon failure. Prefer health endpoints or `docker exec` reads of the safe snapshot. Do not widen `/home/ubuntu/.codex` permissions.
+
+Container fallback:
 
 ```bash
 cd ~/jerry-telemetry-agent
-node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync("state/codex-usage-latest.safe.snapshot.json","utf8")); console.log(JSON.stringify({type:s.type,node_id:s.node?.id,status_ok:s.status?.ok,limits_count:s.limits?.length,observed_at:s.observed_at}, null, 2));'
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml exec jerry-telemetry-agent node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync("/state/codex-usage-latest.safe.snapshot.json","utf8")); console.log(JSON.stringify({type:s.type,node_id:s.node?.id,status_ok:s.status?.ok,limits_count:s.limits?.length,observed_at:s.observed_at}, null, 2));'
 ```
 
 Verify hub latest:
@@ -278,17 +309,26 @@ Stop the daemon:
 
 ```bash
 cd ~/jerry-telemetry-agent
-docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml stop
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml stop
 ```
 
 Rollback the canary:
 
 ```bash
 cd ~/jerry-telemetry-agent
-docker compose -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml down
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml down
 ```
 
-The old `codex-status-telemetry.timer` remains untouched. Do not stop, enable, disable, or modify it as part of this daemon canary.
+The old `codex-status-telemetry.timer` remains untouched. Do not stop, enable, disable, modify, or automatically restore it as part of daemon canary operations. Old sender and collector files remain only as a manual fallback and should not be deleted by canary scripts.
+
+Operational helpers:
+
+```powershell
+scripts/lax-agent-status.ps1
+scripts/lax-agent-logs.ps1 -Tail 100
+scripts/lax-agent-restart.ps1
+scripts/lax-agent-rollback.ps1
+```
 
 ## Daemon Canary Result
 
