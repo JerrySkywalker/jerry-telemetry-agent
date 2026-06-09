@@ -2,7 +2,7 @@
 
 ## Current Canary State
 
-The LAX Docker daemon canary is running on `us-lax-pro-01` / `novix-lax-01` with collector `codex-backend-usage`.
+The LAX Docker daemon canary is running on `us-lax-pro-01` / `novix-lax-01` with collector `codex-backend-usage`. After a healthy Goal 010 observation, it may be treated as the current primary Codex usage telemetry runtime while the old tmux/status chain remains manual fallback only.
 
 - Output mode: `file,http`
 - Poll interval: `300s`
@@ -28,18 +28,24 @@ scripts/lax-agent-status.ps1
 - `latest_snapshot_status_ok=True` or `latest_snapshot_status_ok=true`
 - `latest_snapshot_limits_count=2`
 - `hub_latest_event_id` is present
+- `hub_latest_event_id` has increased across at least one 300 second poll interval
 - `hub_latest_received_at` and `hub_latest_observed_at` are recent for the canary window
+- `pending_spool_count=0`
+- No container restart loop is visible in Compose status
 - `old_timer_active=inactive`
 - `old_timer_enabled=disabled`
 - Logs show no secret markers or token-shaped values
 
 ## 24 Hour Check
 
-- Hub latest `codex.usage.snapshot` is still updating when payload changes.
+- Hub latest `codex.usage.snapshot` repeatedly updates when payload changes.
 - `received_at` advances across observation windows when a new event is accepted by the hub.
 - `observed_at` advances with fresh collector observations.
+- There is no sustained `status.ok=false`.
 - The container has no restart loop in `docker compose --env-file .env ... ps`.
 - `pending_spool_count=0` or returns to zero after temporary hub/network issues.
+- There is no sustained upload backlog.
+- Logs and script output show no secret leakage.
 - `.env` exists, is non-empty for `TELEMETRY_NODE_SECRET`, and is mode `600` when possible.
 - `.env.bak.*` files are counted only; contents are never printed.
 
@@ -51,6 +57,8 @@ scripts/lax-agent-status.ps1
 - `status.ok=true` remains stable.
 - `limits_count=2` remains stable unless the upstream Codex usage schema changes.
 - Old timer remains `disabled/inactive`.
+- It is acceptable to mark the old tmux/status chain as manual fallback only.
+- Do not delete old collector or sender files without a separate cleanup goal and explicit approval.
 - No secret markers appear in logs, docs, PR diffs, or shell output.
 
 ## Failure Criteria
@@ -63,12 +71,22 @@ scripts/lax-agent-status.ps1
 - Hub latest stops updating while local health and collection continue to report success.
 - `pending_spool_count > 0` persists across multiple poll intervals.
 - Compose shows the container repeatedly restarting.
+- Auth failures appear in safe health or summary fields.
 - Any log, script output, or PR diff contains a real secret, token, raw account id, or raw auth payload.
 - Old timer is modified, enabled, or started unexpectedly.
 
 ## Rollback Criteria
 
 Rollback the daemon canary if failure criteria persist and a restart is not sufficient, or if there is any credible secret exposure risk.
+
+Rollback triggers include:
+
+- `status.ok=false` repeatedly.
+- `pending_spool_count` keeps increasing.
+- Hub latest stops updating while local collection reports success.
+- The container enters a restart loop.
+- Safe status fields show an auth failure.
+- Any secret exposure concern.
 
 Dry-run rollback first:
 

@@ -4,6 +4,20 @@ Do not paste secrets, token-shaped values, raw `auth.json`, raw backend response
 
 Spooled events live under `SPOOL_DIR` and are retried before newly captured payloads.
 
+## Current LAX Production State
+
+- Primary candidate: Docker backend usage daemon.
+- Event type: `codex.usage.snapshot`.
+- Node: `us-lax-pro-01`.
+- Hostname: `novix-lax-01`.
+- Health: `http://127.0.0.1:18081/healthz` from LAX only.
+- Status command: `scripts/lax-agent-status.ps1`.
+- Logs command: `scripts/lax-agent-logs.ps1 -Tail 50`.
+- Canary report command: `scripts/lax-agent-canary-report.ps1`.
+- Rollback dry-run: `scripts/lax-agent-rollback.ps1`.
+- Rollback confirmed: `scripts/lax-agent-rollback.ps1 -Confirm`.
+- Old fallback: `codex-status-telemetry.timer` remains `inactive/disabled`; do not modify it without explicit manual approval.
+
 ## LAX Daemon Canary
 
 Status:
@@ -15,7 +29,13 @@ scripts/lax-agent-status.ps1
 Logs:
 
 ```powershell
-scripts/lax-agent-logs.ps1 -Tail 100
+scripts/lax-agent-logs.ps1 -Tail 50
+```
+
+Compact canary report:
+
+```powershell
+scripts/lax-agent-canary-report.ps1
 ```
 
 Restart dry-run:

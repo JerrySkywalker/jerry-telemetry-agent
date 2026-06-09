@@ -53,6 +53,36 @@ scripts/lax-agent-status.ps1
 
 Expected follow-up signals are `env_secret_nonempty=true`, `compose_config_with_env=ok`, and `container_secret_nonempty=true`.
 
+## LAX status reports env_backups_mode_safe=false
+
+`.env.bak.*` files may contain secrets and should be mode `600` or stricter. Fix permissions without printing contents:
+
+```bash
+cd ~/jerry-telemetry-agent
+chmod 600 .env.bak.*
+```
+
+Re-run:
+
+```powershell
+scripts/lax-agent-status.ps1
+```
+
+Expected signal: `env_backups_mode_safe=true`.
+
+## LAX status reports container_secret_nonempty=false
+
+The running container does not have the telemetry secret. Do not print `.env`. Check `env_secret_nonempty` and `compose_config_with_env`.
+
+If the persisted `.env` is healthy, a confirmed restart may be enough:
+
+```powershell
+scripts/lax-agent-restart.ps1
+scripts/lax-agent-restart.ps1 -Confirm
+```
+
+Do not run `down/up` unless a separate rollback or deployment procedure has explicit approval.
+
 ## container_secret_nonempty=true but env_secret_nonempty=false
 
 The running container has a secret, but the persisted `.env` does not. This can survive until the next recreate and then fail. Restore the persisted `.env` secret safely from an approved source without printing it, then verify with the status script. Do not commit `.env` or `.env.bak.*`.
@@ -80,6 +110,28 @@ If permissions need maintenance, adjust only `~/jerry-telemetry-agent/state`. Ne
 
 Trust the health endpoint and safe summary first. Use `scripts/lax-agent-status.ps1` to collect a safe status summary. Do not fail canary health solely because direct host reads of `state/` fail.
 
+## hub event id not increasing
+
+Compare `hub_latest_event_id`, `hub_latest_received_at`, and `hub_latest_observed_at` across at least one 300 second poll interval:
+
+```powershell
+scripts/lax-agent-status.ps1
+```
+
+Normal daemon operation can skip duplicate payloads. Investigate only if local snapshots continue advancing while hub event id and timestamps do not advance across expected upload windows.
+
+## healthz ok but hub not updating
+
+Check:
+
+- `pending_spool_count`
+- `latest_snapshot_status_ok`
+- `latest_snapshot_observed_at`
+- daemon logs with `scripts/lax-agent-logs.ps1 -Tail 100`
+- hub reachability from LAX
+
+If `pending_spool_count` is increasing, treat it as an upload path issue. If spool remains zero and snapshots are healthy, duplicate suppression may explain a stable hub event id.
+
 ## hub latest not updating
 
 Check:
@@ -96,6 +148,12 @@ Normal daemon operation can skip duplicate payloads. Event id and `received_at` 
 
 Spooled events mean uploads failed and will be retried before newly captured payloads. If the count persists across multiple poll intervals, inspect safe logs and hub reachability. Do not print secrets or raw payloads.
 
+If `pending_spool_count` keeps increasing, rollback may be appropriate after confirming hub reachability and daemon health.
+
+## old timer unexpectedly active
+
+If `old_timer_active` is not `inactive` or `old_timer_enabled` is not `disabled`, stop and get manual approval before making any systemd change. Do not run `systemctl stop`, `enable`, `disable`, or edit the timer as part of routine canary observation.
+
 ## LAX daemon rollback procedure
 
 Dry-run:
@@ -111,6 +169,8 @@ scripts/lax-agent-rollback.ps1 -Confirm
 ```
 
 Rollback runs Compose `down` with `--env-file .env`. It does not delete `state/`, `.env`, `.env.bak.*`, old sender files, or old collector files. It does not enable `codex-status-telemetry.timer` and does not modify the hub.
+
+After rollback, verify healthz no longer responds locally and hub latest no longer receives daemon events. Re-enable any old fallback only with explicit manual approval.
 
 ## PR ready check fails with dirty working tree
 
