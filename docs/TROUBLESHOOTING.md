@@ -22,6 +22,82 @@ Check that `HOST_CODEX_BIN` exists, is executable, and that `HOST_CODEX_HOME` is
 
 Non-2xx hub responses are treated as failures. Events are written to `SPOOL_DIR` and retried on the next run.
 
+## Primary runtime failure triage
+
+The current primary runtime is the LAX Docker backend usage daemon. Start with safe status only:
+
+```powershell
+scripts/lax-agent-status.ps1
+scripts/lax-agent-canary-report.ps1
+scripts/lax-agent-logs.ps1 -Tail 50
+```
+
+Do not restart, rebuild, run `down/up`, change systemd, rewrite secrets, or modify the hub during triage unless there is explicit manual approval.
+
+Check:
+
+- `healthz_ok`
+- `container_running`
+- `latest_snapshot_status_ok`
+- `latest_snapshot_limits_count`
+- `pending_spool_count`
+- `hub_latest_event_id`
+- `old_timer_active`
+- `old_timer_enabled`
+
+## When to rollback Docker daemon
+
+Rollback is appropriate when primary runtime failure criteria persist:
+
+- `status.ok=false` repeatedly.
+- `pending_spool_count` keeps increasing.
+- Hub latest event id or timestamps stop updating while local snapshots continue advancing.
+- Container restart loop.
+- Safe status fields indicate auth failure.
+- Any secret exposure concern.
+
+Dry-run first:
+
+```powershell
+scripts/lax-agent-rollback.ps1
+```
+
+Confirmed rollback:
+
+```powershell
+scripts/lax-agent-rollback.ps1 -Confirm
+```
+
+Rollback must not delete `state/`, `.env`, `.env.bak.*`, old sender files, old collector files, or old systemd unit files.
+
+## When to manually reactivate old fallback
+
+Manual reactivation of the old tmux/status fallback is only for an approved rollback path after Docker primary runtime failure. It requires explicit manual approval.
+
+Before any reactivation decision, run the read-only fallback status:
+
+```powershell
+scripts/lax-old-fallback-status.ps1
+```
+
+Do not auto-enable `codex-status-telemetry.timer`. Do not start, stop, enable, disable, or edit systemd units during routine troubleshooting.
+
+## status.ok=false
+
+If `latest_snapshot_status_ok=false`, inspect only safe health or summary fields and logs. Common causes include Codex backend auth problems, endpoint failures, or schema changes. Do not print `auth.json`, tokens, raw backend responses, `.env`, or `.env.bak.*`.
+
+## container restart loop
+
+If Compose status shows repeated restarts, collect safe status and logs, then decide between confirmed restart or rollback. Do not run `down/up` for routine troubleshooting.
+
+## auth failure
+
+If safe status fields indicate auth failure, re-authenticate Codex CLI on LAX only through an approved manual process. Do not copy `auth.json`, do not widen `/home/ubuntu/.codex` permissions, and do not bake credentials into Docker images.
+
+## secret exposure concern
+
+If any log, PR diff, script output, or shell history may contain a real secret or token, stop routine operations. Treat rollback and secret rotation as manual incident response. Do not paste the suspected secret into issues, PR comments, docs, or chat.
+
 ## Duplicate payload skipped
 
 By default identical payloads are not resent. Set `FORCE_SEND=true` to override.

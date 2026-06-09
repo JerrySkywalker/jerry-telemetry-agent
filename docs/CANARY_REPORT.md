@@ -1,10 +1,10 @@
 # LAX Daemon Canary Observation Report
 
-Observation time: `2026-06-09T10:33:14Z` from safe LAX status and hub latest checks.
+Observation time: `2026-06-09T13:48:51Z` from safe LAX status and hub latest checks.
 
 ## Current Status Summary
 
-The LAX Docker backend usage daemon is healthy at the latest observation and is ready to be treated as the current primary Codex usage telemetry runtime, subject to continued healthy observation.
+The LAX Docker backend usage daemon is healthy at the latest observation and is declared as the current primary Codex usage telemetry runtime. The old tmux/status chain remains retained as manual fallback only.
 
 - Node id: `us-lax-pro-01`
 - Hostname: `novix-lax-01`
@@ -36,19 +36,25 @@ The LAX Docker backend usage daemon is healthy at the latest observation and is 
 
 Hub latest safe fields:
 
-- Latest event id: `47`
-- Latest received at: `2026-06-09T10:33:14Z`
-- Latest observed at: `2026-06-09T10:33:13Z`
+- Latest event id: `86`
+- Latest received at: `2026-06-09T13:48:51Z`
+- Latest observed at: `2026-06-09T13:48:51Z`
 - Node id: `us-lax-pro-01`
 - Collector: `codex_backend_usage`
 - `status.ok=true`
 - `limits_count=2`
 
-The latest node endpoint also points at event id `47` with matching node, collector, status, and limits count.
+The latest node endpoint also points at event id `86` with matching node, collector, status, and limits count.
 
 ## Event Progression
 
-Recent observation showed hub latest moving from event id `43` to `44` over one polling interval before this report. This goal then observed event ids `45`, `46`, and `47`, confirming continued event progression during canary observation.
+Recent observation showed hub latest moving from event id `43` to `44` over one polling interval. Later checks observed event ids `45`, `46`, `47`, `48`, `84`, and `86`, confirming continued event progression during canary observation.
+
+## Observation Gates
+
+- 1-hour canary criterion: satisfied.
+- 24-hour observation: pending continued observation.
+- 72-hour observation: pending continued observation.
 
 ## Logs
 
@@ -56,14 +62,14 @@ Recent observation showed hub latest moving from event id `43` to `44` over one 
 
 ## Known Remaining Limitations
 
-- Direct host reads of `state/codex-usage-latest.safe.snapshot.json` may still be restricted because Docker can write state files with container-owned permissions.
+- Direct host reads of `state/codex-usage-latest.safe.snapshot.json` remain restricted because Docker can write state files with container-owned permissions.
 - This is non-blocking while `healthz`, `/api/codex/usage/latest`, container-safe reads, and hub latest checks remain healthy.
 - Do not broaden `/home/ubuntu/.codex` permissions.
 - `.env` and `.env.bak.*` remain secret files and must not be printed, copied into the repository, or committed.
 
 ## Promotion Recommendation
 
-The new LAX Docker backend usage daemon can be treated as the current primary Codex usage telemetry runtime if the latest observation remains healthy.
+Primary runtime declaration is acceptable now because the Docker daemon is healthy and the old fallback remains retained.
 
 The old tmux/status chain remains manual fallback only:
 
