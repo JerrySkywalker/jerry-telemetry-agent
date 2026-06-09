@@ -65,13 +65,14 @@ Use [docs/CANARY_CHECKLIST.md](docs/CANARY_CHECKLIST.md) for 1 hour, 24 hour, an
 
 ## Current LAX Runtime
 
-The LAX backend usage Docker daemon is the current canary runtime and primary candidate for Codex usage telemetry. It emits `codex.usage.snapshot` for `us-lax-pro-01`; the old tmux/status chain is retained as manual fallback only.
+The LAX backend usage Docker daemon is the current primary Codex usage telemetry runtime. It emits `codex.usage.snapshot` for `us-lax-pro-01`; the old tmux/status chain is retained as manual fallback only.
 
 ```powershell
 scripts/lax-agent-status.ps1
 scripts/lax-agent-logs.ps1 -Tail 50
 scripts/lax-agent-canary-report.ps1
 scripts/lax-agent-rollback.ps1
+scripts/lax-old-fallback-status.ps1
 ```
 
 Do not re-enable the old timer or delete old sender/collector files without a separate approved cleanup or rollback goal.

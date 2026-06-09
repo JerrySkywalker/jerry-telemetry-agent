@@ -64,7 +64,7 @@ foreach ($item in $requiredChecks.GetEnumerator()) {
 $healthy = $failedChecks.Count -eq 0
 
 Write-Host "observation_time_utc=$((Get-Date).ToUniversalTime().ToString("o"))"
-Write-Host "primary_candidate=Docker backend usage daemon"
+Write-Host "primary_runtime=Docker backend usage daemon"
 Write-Host "canary_healthy=$($healthy.ToString().ToLowerInvariant())"
 Write-Host "failed_checks=$($failedChecks -join ",")"
 Write-Host "node_id=$(Get-StatusValue $status "node_id")"
@@ -83,4 +83,4 @@ Write-Host "env_backup_count=$(Get-StatusValue $status "env_backup_count")"
 Write-Host "env_backups_mode_safe=$(Get-StatusValue $status "env_backups_mode_safe")"
 Write-Host "old_timer_active=$(Get-StatusValue $status "old_timer_active")"
 Write-Host "old_timer_enabled=$(Get-StatusValue $status "old_timer_enabled")"
-Write-Host "recommendation=Treat as current primary Codex usage telemetry runtime if latest observation remains healthy; keep old chain as manual fallback."
+Write-Host "recommendation=Current primary Codex usage telemetry runtime; keep old chain as manual fallback."

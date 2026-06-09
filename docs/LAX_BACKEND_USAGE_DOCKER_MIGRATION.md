@@ -25,16 +25,19 @@ Completed phases:
 - LAX real once upload.
 - LAX Docker daemon canary.
 - LAX daemon operations hardening.
+- LAX canary observation report.
 
 Current phase:
 
-- Canary observation and promotion readiness.
+- Primary runtime declared.
 
-Next phase:
+Pending phases:
 
-- Primary runtime declaration after continued healthy observation.
+- 24-hour and 72-hour continued observation.
+- Optional old fallback archival under a separate approved cleanup goal.
+- Dashboard / Glance integration.
 
-Current primary candidate:
+Current primary runtime:
 
 - Docker backend usage daemon emitting `codex.usage.snapshot`.
 
@@ -194,12 +197,12 @@ No daemon mode was enabled, no production hub settings were changed, and no old 
 
 ## Daemon Canary
 
-Goal 008 enabled the Dockerized backend usage collector as a controlled daemon canary. Goal 009 hardened observation and operations around the already-running canary. Goal 010 records canary observation and primary-runtime readiness.
+Goal 008 enabled the Dockerized backend usage collector as a controlled daemon canary. Goal 009 hardened observation and operations around the already-running canary. Goal 010 recorded canary observation and primary-runtime readiness. Goal 011 declares the Docker backend usage daemon as the current primary runtime and freezes the old tmux/status chain as manual fallback only.
 
 Current canary state:
 
 - LAX Docker daemon canary is running.
-- The Docker backend usage daemon is the current primary candidate for Codex usage telemetry.
+- The Docker backend usage daemon is the current primary Codex usage telemetry runtime.
 - `TELEMETRY_NODE_ID=us-lax-pro-01`
 - `TELEMETRY_HOSTNAME=novix-lax-01`
 - `TELEMETRY_COLLECTOR=codex-backend-usage`
