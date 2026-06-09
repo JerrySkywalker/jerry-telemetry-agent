@@ -71,12 +71,38 @@ The dry-run requires a successful backend usage snapshot with at least one norma
 
 ## LAX real-once latest event is missing
 
-Do not retry in daemon mode. Check the one-shot container output and spooled events under `~/jerry-telemetry-agent/state/spool`. Confirm `TELEMETRY_OUTPUT_MODE=file,http`, `TELEMETRY_NODE_ID=us-lax-pro-01`, and the production secret were set manually on LAX outside git.
+Do not retry in daemon mode. Check the one-shot container output and spooled events under `~/jerry-telemetry-agent/state/spool`. Confirm `TELEMETRY_OUTPUT_MODE=http,file`, `TELEMETRY_NODE_ID=us-lax-pro-01`, and that the old sender env on LAX contains `TELEMETRY_SECRET`.
+
+The guarded once-upload command is:
+
+```powershell
+scripts/lax-agent-real-once-upload.ps1 -ConfirmProductionUpload
+```
+
+If the script reports a missing old sender env or missing `TELEMETRY_SECRET`, stop and add the secret manually on LAX outside git. Do not paste the value into logs, docs, PR comments, or shell history.
+
+If the upload command exits successfully but the latest endpoint is stale, inspect the safe container output:
+
+```bash
+sed -n '1,220p' /tmp/jerry-telemetry-agent-real-once.stdout
+```
+
+Do not print `send-latest.env`, `.env`, `auth.json`, or raw secrets.
 
 Verify the old status timer was not changed:
 
 ```bash
 systemctl status codex-status-telemetry.timer --no-pager
+```
+
+## LAX state files are owned by root
+
+Docker once-runs may write `state/*.json` as root because the container process runs as root. Prefer validating snapshots through the container or via hub latest endpoints instead of changing ownership during production checks.
+
+If a later maintenance workflow needs host-user access to generated state files, fix only the Docker agent deployment state directory and do not touch old sender files:
+
+```bash
+sudo chown -R ubuntu:ubuntu ~/jerry-telemetry-agent/state ~/jerry-telemetry-agent/deploy/lax/state
 ```
 
 ## Local backend smoke fails
