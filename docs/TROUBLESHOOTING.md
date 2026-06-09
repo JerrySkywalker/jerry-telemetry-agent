@@ -30,6 +30,88 @@ By default identical payloads are not resent. Set `FORCE_SEND=true` to override.
 
 Run `docker compose config` locally from the repository root. This validates Compose syntax and environment interpolation without building images or contacting Docker Hub.
 
+## LAX daemon reports TELEMETRY_NODE_SECRET unset warning
+
+Run LAX daemon Compose operations with the explicit env file:
+
+```bash
+cd ~/jerry-telemetry-agent
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml config
+```
+
+If the warning only appears without `--env-file .env`, fix the operational command or script. Do not paste `.env` contents.
+
+## LAX status reports env_secret_nonempty=false
+
+Treat this as a production secret persistence issue. Check only whether `.env` exists, whether `TELEMETRY_NODE_SECRET` is non-empty, and the file mode. Do not print the value.
+
+If the secret must be restored, do it manually on LAX outside git and then run:
+
+```powershell
+scripts/lax-agent-status.ps1
+```
+
+Expected follow-up signals are `env_secret_nonempty=true`, `compose_config_with_env=ok`, and `container_secret_nonempty=true`.
+
+## container_secret_nonempty=true but env_secret_nonempty=false
+
+The running container has a secret, but the persisted `.env` does not. This can survive until the next recreate and then fail. Restore the persisted `.env` secret safely from an approved source without printing it, then verify with the status script. Do not commit `.env` or `.env.bak.*`.
+
+## LAX state snapshot PermissionError
+
+Host reads of `~/jerry-telemetry-agent/state/*.safe.snapshot.json` can fail when Docker wrote files as root. This does not by itself mean the daemon is unhealthy.
+
+Prefer:
+
+```bash
+curl -fsS http://127.0.0.1:18081/api/codex/usage/summary
+```
+
+Fallback to a container read of the safe snapshot:
+
+```bash
+cd ~/jerry-telemetry-agent
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml exec jerry-telemetry-agent node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync("/state/codex-usage-latest.safe.snapshot.json","utf8")); console.log(JSON.stringify({status_ok:s.status?.ok,limits_count:s.limits?.length,observed_at:s.observed_at}))'
+```
+
+If permissions need maintenance, adjust only `~/jerry-telemetry-agent/state`. Never widen `/home/ubuntu/.codex` permissions.
+
+## healthz ok but file read fails
+
+Trust the health endpoint and safe summary first. Use `scripts/lax-agent-status.ps1` to collect a safe status summary. Do not fail canary health solely because direct host reads of `state/` fail.
+
+## hub latest not updating
+
+Check:
+
+- `healthz_ok=true`
+- `latest_snapshot_status_ok=true`
+- `pending_spool_count`
+- daemon logs with `scripts/lax-agent-logs.ps1 -Tail 100`
+- hub latest event id and timestamps from `scripts/lax-agent-status.ps1`
+
+Normal daemon operation can skip duplicate payloads. Event id and `received_at` advance only when the hub accepts a new event.
+
+## pending_spool_count > 0
+
+Spooled events mean uploads failed and will be retried before newly captured payloads. If the count persists across multiple poll intervals, inspect safe logs and hub reachability. Do not print secrets or raw payloads.
+
+## LAX daemon rollback procedure
+
+Dry-run:
+
+```powershell
+scripts/lax-agent-rollback.ps1
+```
+
+Execute:
+
+```powershell
+scripts/lax-agent-rollback.ps1 -Confirm
+```
+
+Rollback runs Compose `down` with `--env-file .env`. It does not delete `state/`, `.env`, `.env.bak.*`, old sender files, or old collector files. It does not enable `codex-status-telemetry.timer` and does not modify the hub.
+
 ## PR ready check fails with dirty working tree
 
 Commit or stash local changes before running `scripts/pr-ready-check.ps1`. The check requires a clean branch so the PR description and validation results match the code being reviewed.

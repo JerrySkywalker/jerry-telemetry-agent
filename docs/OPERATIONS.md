@@ -1,16 +1,82 @@
 # Operations
 
-Useful commands:
-
-```bash
-docker compose config
-docker compose build
-docker compose up -d
-curl http://127.0.0.1:8081/healthz
-curl http://127.0.0.1:8081/status
-```
+Do not paste secrets, token-shaped values, raw `auth.json`, raw backend responses, `.env`, or `.env.bak.*` contents into issues, PRs, docs, or chat.
 
 Spooled events live under `SPOOL_DIR` and are retried before newly captured payloads.
+
+## LAX Daemon Canary
+
+Status:
+
+```powershell
+scripts/lax-agent-status.ps1
+```
+
+Logs:
+
+```powershell
+scripts/lax-agent-logs.ps1 -Tail 100
+```
+
+Restart dry-run:
+
+```powershell
+scripts/lax-agent-restart.ps1
+```
+
+Confirmed restart:
+
+```powershell
+scripts/lax-agent-restart.ps1 -Confirm
+```
+
+Restart uses `docker compose restart`; it does not rebuild and does not run `down/up`.
+
+Rollback dry-run:
+
+```powershell
+scripts/lax-agent-rollback.ps1
+```
+
+Confirmed rollback:
+
+```powershell
+scripts/lax-agent-rollback.ps1 -Confirm
+```
+
+Rollback only runs:
+
+```bash
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml down
+```
+
+It does not delete `state/`, `.env`, `.env.bak.*`, old sender files, or old collector files. It does not enable the old systemd timer and does not modify the telemetry hub.
+
+Hub latest check:
+
+```bash
+curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+curl -fsS https://telemetry.jerryskywalker.space/v1/nodes/us-lax-pro-01/latest
+```
+
+Local health check from LAX only:
+
+```bash
+curl -fsS http://127.0.0.1:18081/healthz
+curl -fsS http://127.0.0.1:18081/api/codex/usage/summary
+```
+
+All LAX daemon Compose commands must use:
+
+```bash
+docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example -f docker-compose.daemon.yml ...
+```
+
+This keeps `TELEMETRY_NODE_SECRET` interpolation explicit and avoids unset warnings.
+
+LAX `state/` files may be owned by the container user. Prefer health endpoints or `docker exec` safe-summary reads. If permissions ever need adjustment, adjust only `~/jerry-telemetry-agent/state`; never widen `/home/ubuntu/.codex` permissions.
+
+`.env` and `.env.bak.*` are secret files. Scripts may report existence, non-empty secret status, counts, and permission summaries, but must not print contents. Prefer `chmod 600 .env .env.bak.*`.
 
 ## LAX Backend Usage Dry-Run
 

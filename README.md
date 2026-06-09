@@ -53,6 +53,16 @@ scripts/lax-agent-dry-run.ps1
 
 The dry-run copies the current committed tree to `~/jerry-telemetry-agent`, creates a non-secret `.env`, runs `docker compose config`, and runs backend usage once with `stdout,file` only. It does not upload to the hub, enable daemon mode, or touch the existing `codex-status-telemetry.timer`.
 
+LAX daemon canary operations:
+
+```powershell
+scripts/lax-agent-status.ps1
+scripts/lax-agent-logs.ps1 -Tail 100
+scripts/lax-agent-rollback.ps1
+```
+
+Use [docs/CANARY_CHECKLIST.md](docs/CANARY_CHECKLIST.md) for 1 hour, 24 hour, and 72 hour observation gates. Rollback is dry-run by default and requires `-Confirm` to run Compose `down`.
+
 Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_SECRET`, access tokens, refresh tokens, raw `auth.json`, or raw backend usage responses.
 
 ## Development Workflow

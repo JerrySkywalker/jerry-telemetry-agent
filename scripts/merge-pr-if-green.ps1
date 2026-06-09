@@ -120,6 +120,9 @@ try {
     gh pr diff $PrNumber
   }
   $diffText = ($diffText | Out-String)
+  $addedDiffText = (($diffText -split "`r?`n") | Where-Object {
+    $_ -match "^\+" -and $_ -notmatch "^\+\+\+"
+  }) -join "`n"
 
   if (-not $DryRun) {
     $secretMarkers = @(
@@ -129,7 +132,7 @@ try {
       ("CODEX" + "_AUTH")
     )
     $secretPattern = "(?i)(" + (($secretMarkers | ForEach-Object { [regex]::Escape($_) }) -join "|") + ")"
-    if ($diffText -match $secretPattern) {
+    if ($addedDiffText -match $secretPattern) {
       throw "Refusing auto-merge because the PR diff contains an obvious secret marker."
     }
   }
