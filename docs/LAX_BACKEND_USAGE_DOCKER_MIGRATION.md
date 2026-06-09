@@ -16,6 +16,37 @@ Backend usage is the primary migration path. Host prerequisites are only Docker 
 
 The existing LAX production timer remains unchanged until explicit manual approval. Do not stop, disable, or replace it during preflight, dry-run, or once-upload work.
 
+## Migration State
+
+Completed phases:
+
+- Local backend usage smoke.
+- LAX Docker dry-run.
+- LAX real once upload.
+- LAX Docker daemon canary.
+- LAX daemon operations hardening.
+
+Current phase:
+
+- Canary observation and promotion readiness.
+
+Next phase:
+
+- Primary runtime declaration after continued healthy observation.
+
+Current primary candidate:
+
+- Docker backend usage daemon emitting `codex.usage.snapshot`.
+
+Old tmux/status chain:
+
+- `codex-status-telemetry.timer` is expected to remain `inactive/disabled`.
+- Old collector and sender files are retained.
+- Old chain is manual fallback only.
+- Do not re-enable old timer without explicit manual approval.
+
+All daemon Compose operations must use `--env-file .env`. `.env` and `.env.bak.*` are secret files; keep them mode `600`, never print them, and never commit them.
+
 ## Preflight
 
 ```powershell
@@ -163,11 +194,12 @@ No daemon mode was enabled, no production hub settings were changed, and no old 
 
 ## Daemon Canary
 
-Goal 008 enabled the Dockerized backend usage collector as a controlled daemon canary. Goal 009 hardens observation and operations around the already-running canary.
+Goal 008 enabled the Dockerized backend usage collector as a controlled daemon canary. Goal 009 hardened observation and operations around the already-running canary. Goal 010 records canary observation and primary-runtime readiness.
 
 Current canary state:
 
 - LAX Docker daemon canary is running.
+- The Docker backend usage daemon is the current primary candidate for Codex usage telemetry.
 - `TELEMETRY_NODE_ID=us-lax-pro-01`
 - `TELEMETRY_HOSTNAME=novix-lax-01`
 - `TELEMETRY_COLLECTOR=codex-backend-usage`
@@ -175,6 +207,7 @@ Current canary state:
 - `CODEX_USAGE_POLL_INTERVAL_SECONDS=300`
 - Health is exposed only on LAX localhost: `127.0.0.1:18081->8081`.
 - The old `codex-status-telemetry.timer` should remain `disabled` and `inactive`.
+- Old tmux/status files are retained as manual fallback only.
 
 All LAX daemon Compose operations must pass the persisted env file explicitly:
 
@@ -189,7 +222,7 @@ The LAX files `.env` and `.env.bak.*` are secret files:
 - Do not print their contents.
 - Do not copy them into the repository.
 - Do not commit them.
-- Prefer mode `600`.
+- Keep mode `600`.
 - Status tooling may report existence, non-empty secret status, counts, and permission summaries only.
 
 Start the daemon from the local repository:
