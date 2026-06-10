@@ -22,6 +22,17 @@ Check that `HOST_CODEX_BIN` exists, is executable, and that `HOST_CODEX_HOME` is
 
 Non-2xx hub responses are treated as failures. Events are written to `SPOOL_DIR` and retried on the next run.
 
+## agent health event missing
+
+Run the safe local or LAX health checks:
+
+```powershell
+scripts/smoke-agent-health-local.ps1
+scripts/lax-agent-health-status.ps1
+```
+
+Daemon mode should emit `telemetry.agent.health` after each collection iteration, including iterations where `codex.usage.snapshot` is skipped as an unchanged duplicate. Once mode needs `--health` or `TELEMETRY_AGENT_HEALTH_ENABLED=true`.
+
 ## Primary runtime failure triage
 
 The current primary runtime is the LAX Docker backend usage daemon. Start with safe status only:
@@ -40,6 +51,8 @@ Check:
 - `container_running`
 - `latest_snapshot_status_ok`
 - `latest_snapshot_limits_count`
+- `agent health event_type=telemetry.agent.health`
+- `agent health status_ok`
 - `pending_spool_count`
 - `hub_latest_event_id`
 - `old_timer_active`

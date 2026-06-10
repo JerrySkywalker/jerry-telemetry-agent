@@ -8,6 +8,7 @@
 - Raw Codex account and session IDs are redacted before fallback upload.
 - Payloads that still contain unredacted account or session identifiers are rejected.
 - HTTP output sends only the normalized `codex.usage.snapshot` inside the hub envelope.
+- Agent health output sends only safe booleans, counts, timestamps, and string categories inside `telemetry.agent.health`. It records sensitive categories in `raw_omitted_keys` but never includes secret values, raw env, Authorization headers, raw `auth.json`, account ids, or raw backend responses.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.
 
 ## Repository Guardrails

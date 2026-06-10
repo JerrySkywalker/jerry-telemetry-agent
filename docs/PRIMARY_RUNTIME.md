@@ -6,11 +6,13 @@ The current primary Codex usage telemetry runtime for LAX is the Docker backend 
 
 - Runtime: LAX Docker backend usage daemon
 - Event type: `codex.usage.snapshot`
+- Agent health event type: `telemetry.agent.health`
 - Node id: `us-lax-pro-01`
 - Hostname: `novix-lax-01`
 - Collector: `codex-backend-usage`
 - Output mode: `file,http`
-- Health endpoint: `http://127.0.0.1:18081/healthz` from LAX only
+- Local health endpoint: `http://127.0.0.1:18081/healthz` from LAX only
+- Remote monitor health source: latest `telemetry.agent.health` in the telemetry hub
 
 Routine status:
 
@@ -23,6 +25,7 @@ Hub checks:
 
 ```text
 https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+https://telemetry.jerryskywalker.space/v1/events/latest/telemetry.agent.health
 https://telemetry.jerryskywalker.space/v1/nodes/us-lax-pro-01/latest
 ```
 

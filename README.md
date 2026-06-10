@@ -4,6 +4,8 @@ Dockerized node-side telemetry agent for Jerry telemetry hub.
 
 Primary Codex collection now reads local Codex `auth.json`, uses the ChatGPT-managed access token to call `https://chatgpt.com/backend-api/wham/usage`, normalizes the response into `codex.usage.snapshot`, and emits it through stdout, file, or HTTP sinks. The tmux `/status` collector is fallback only.
 
+The daemon also emits `telemetry.agent.health` after each collection iteration. This push event is the production health source for remote monitors; beijing monitor should read it from the hub instead of SSHing to LAX by default. See [docs/AGENT_HEALTH_EVENT.md](docs/AGENT_HEALTH_EVENT.md).
+
 ## Quick Start
 
 ```powershell
@@ -33,6 +35,12 @@ For a local backend usage smoke that writes only a safe file and does not upload
 
 ```powershell
 scripts/smoke-codex-backend-usage-local.ps1
+```
+
+For a local agent health smoke that does not read `auth.json` and does not upload:
+
+```powershell
+scripts/smoke-agent-health-local.ps1
 ```
 
 For migration fallback file mode:
@@ -66,9 +74,11 @@ Use [docs/CANARY_CHECKLIST.md](docs/CANARY_CHECKLIST.md) for 1 hour, 24 hour, an
 ## Current LAX Runtime
 
 The LAX backend usage Docker daemon is the current primary Codex usage telemetry runtime. It emits `codex.usage.snapshot` for `us-lax-pro-01`; the old tmux/status chain is retained as manual fallback only.
+It also emits `telemetry.agent.health` for `us-lax-pro-01`; the local `/healthz` endpoint remains a localhost-only auxiliary check.
 
 ```powershell
 scripts/lax-agent-status.ps1
+scripts/lax-agent-health-status.ps1
 scripts/lax-agent-logs.ps1 -Tail 50
 scripts/lax-agent-canary-report.ps1
 scripts/lax-agent-rollback.ps1

@@ -16,6 +16,10 @@ services:
       TELEMETRY_OUTPUT_FILE: ${TELEMETRY_OUTPUT_FILE:-/state/codex-usage-latest.safe.snapshot.json}
       CODEX_USAGE_LATEST_PATH: ${CODEX_USAGE_LATEST_PATH:-/state/codex-usage-latest.safe.snapshot.json}
       CODEX_USAGE_LAST_GOOD_PATH: ${CODEX_USAGE_LAST_GOOD_PATH:-/state/codex-usage-last-good.safe.snapshot.json}
+      TELEMETRY_AGENT_HEALTH_ENABLED: ${TELEMETRY_AGENT_HEALTH_ENABLED:-true}
+      TELEMETRY_AGENT_HEALTH_EVENT_TYPE: ${TELEMETRY_AGENT_HEALTH_EVENT_TYPE:-telemetry.agent.health}
+      TELEMETRY_AGENT_HEALTH_INTERVAL_SECONDS: ${TELEMETRY_AGENT_HEALTH_INTERVAL_SECONDS:-300}
+      TELEMETRY_AGENT_HEALTH_OUTPUT_FILE: ${TELEMETRY_AGENT_HEALTH_OUTPUT_FILE:-/state/agent-health-latest.safe.snapshot.json}
       STATE_PATH: ${STATE_PATH:-/state/agent-state.json}
       SPOOL_DIR: ${SPOOL_DIR:-/state/spool}
       HEALTH_SERVER_ENABLED: ${HEALTH_SERVER_ENABLED:-true}

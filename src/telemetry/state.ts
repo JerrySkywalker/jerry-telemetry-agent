@@ -7,6 +7,9 @@ export interface AgentState {
   lastSourceFile?: string;
   lastSuccessfulSendAt?: string;
   lastSuccessfulUsageAt?: string;
+  lastHealthEventAt?: string;
+  lastSuccessfulHealthSendAt?: string;
+  lastHttpErrorAt?: string;
   lastError?: string;
 }
 
