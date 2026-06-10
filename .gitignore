@@ -9,6 +9,7 @@ logs/
 coverage/
 *.log
 .smoke/
+.smoke-agent-health/
 
 # Local Codex usage probes / secrets
 *.raw.local-only.json

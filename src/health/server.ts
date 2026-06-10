@@ -8,7 +8,7 @@ import type { CodexUsageSnapshot } from "../types/codex-usage.js";
 
 export function startHealthServer(config: Config): http.Server {
   const server = http.createServer(async (req, res) => {
-    if (!req.url || !["/healthz", "/status", "/api/codex/usage/latest", "/api/codex/usage/summary"].includes(req.url)) {
+    if (!req.url || !["/healthz", "/status", "/api/codex/usage/latest", "/api/codex/usage/summary", "/api/agent/health/latest"].includes(req.url)) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "not_found" }));
       return;
@@ -22,6 +22,11 @@ export function startHealthServer(config: Config): http.Server {
     if (req.url === "/api/codex/usage/summary") {
       const latest = await readSnapshot(config.usageLatestPath);
       writeJson(res, latest ? summarizeCodexUsage(latest, state.lastSuccessfulUsageAt ?? state.lastSuccessfulSendAt) : { error: "not_found" }, latest ? 200 : 404);
+      return;
+    }
+    if (req.url === "/api/agent/health/latest") {
+      const latest = await readJson(config.agentHealthOutputFile);
+      writeJson(res, latest ?? { error: "not_found" }, latest ? 200 : 404);
       return;
     }
     const body = {
@@ -42,8 +47,12 @@ export function startHealthServer(config: Config): http.Server {
 }
 
 async function readSnapshot(file: string): Promise<CodexUsageSnapshot | undefined> {
+  return readJson(file) as Promise<CodexUsageSnapshot | undefined>;
+}
+
+async function readJson(file: string): Promise<unknown | undefined> {
   try {
-    return JSON.parse(await readFile(file, "utf8")) as CodexUsageSnapshot;
+    return JSON.parse(await readFile(file, "utf8")) as unknown;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw error;

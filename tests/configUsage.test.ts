@@ -7,6 +7,14 @@ describe("usage collector config", () => {
     expect(config.collectorMode).toBe("codex-backend-usage");
     expect(config.provider).toBe("backend-usage");
     expect(config.intervalSeconds).toBe(300);
+    expect(config.agentHealthEnabled).toBe(true);
+    expect(config.agentHealthEventType).toBe("telemetry.agent.health");
+  });
+
+  it("keeps once health opt-in unless requested", () => {
+    expect(loadConfig({}, ["--once"]).agentHealthEnabled).toBe(false);
+    expect(loadConfig({}, ["--once", "--health"]).agentHealthEnabled).toBe(true);
+    expect(loadConfig({ TELEMETRY_AGENT_HEALTH_ENABLED: "true" }, ["--once"]).agentHealthEnabled).toBe(true);
   });
 
   it("enables tmux fallback only when requested", () => {

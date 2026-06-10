@@ -40,6 +40,7 @@ Pending phases:
 Current primary runtime:
 
 - Docker backend usage daemon emitting `codex.usage.snapshot`.
+- Same daemon emitting `telemetry.agent.health` for push-based monitor health.
 
 Old tmux/status chain:
 
@@ -328,6 +329,7 @@ Verify hub latest:
 
 ```bash
 curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/telemetry.agent.health
 curl -fsS https://telemetry.jerryskywalker.space/v1/nodes/us-lax-pro-01/latest
 ```
 
@@ -416,6 +418,7 @@ Equivalent npm command:
 
 ```powershell
 npm run smoke:codex-backend
+npm run smoke:agent-health
 ```
 
 Backend once, stdout only, no upload:

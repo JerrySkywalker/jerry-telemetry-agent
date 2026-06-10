@@ -39,6 +39,10 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     healthServerEnabled: false,
     healthHost: "127.0.0.1",
     healthPort: 8081,
+    agentHealthEnabled: false,
+    agentHealthEventType: "telemetry.agent.health",
+    agentHealthIntervalSeconds: 600,
+    agentHealthOutputFile: "/state/agent-health-latest.safe.snapshot.json",
     ...overrides
   };
 }

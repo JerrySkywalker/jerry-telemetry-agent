@@ -37,6 +37,10 @@ export interface Config {
   healthServerEnabled: boolean;
   healthHost: string;
   healthPort: number;
+  agentHealthEnabled: boolean;
+  agentHealthEventType: "telemetry.agent.health";
+  agentHealthIntervalSeconds: number;
+  agentHealthOutputFile: string;
 }
 
 export function defaultCodexHome(env: NodeJS.ProcessEnv = process.env, platform = process.platform, homeDir = os.homedir()): string {
@@ -104,9 +108,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
       (bool(env.TELEMETRY_ENABLE_TMUX_FALLBACK, false) ? "codex-cli-status-fallback" : "codex-backend-usage")
   );
   const statePath = env.STATE_PATH ?? "/state/agent-state.json";
+  const agentMode = mode(cliMode ?? env.AGENT_MODE ?? "daemon");
+  const agentHealthDefault = agentMode === "daemon" || hasFlag(args, "--health");
 
   return {
-    mode: mode(cliMode ?? env.AGENT_MODE ?? "daemon"),
+    mode: agentMode,
     dryRun: hasFlag(args, "--dry-run") || bool(env.DRY_RUN, false),
     provider: provider(cliProvider ?? env.CODEX_PROVIDER ?? "backend-usage"),
     outputModes: outputModes(env.TELEMETRY_OUTPUT_MODE),
@@ -135,7 +141,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     forceSend: bool(env.FORCE_SEND, false),
     healthServerEnabled: bool(env.HEALTH_SERVER_ENABLED, false),
     healthHost: env.HEALTH_HOST ?? "0.0.0.0",
-    healthPort: int(env.HEALTH_PORT, 8081)
+    healthPort: int(env.HEALTH_PORT, 8081),
+    agentHealthEnabled: hasFlag(args, "--no-health") ? false : bool(env.TELEMETRY_AGENT_HEALTH_ENABLED, agentHealthDefault),
+    agentHealthEventType: "telemetry.agent.health",
+    agentHealthIntervalSeconds: int(env.TELEMETRY_AGENT_HEALTH_INTERVAL_SECONDS, int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300)),
+    agentHealthOutputFile: env.TELEMETRY_AGENT_HEALTH_OUTPUT_FILE ?? "/state/agent-health-latest.safe.snapshot.json"
   };
 }
 

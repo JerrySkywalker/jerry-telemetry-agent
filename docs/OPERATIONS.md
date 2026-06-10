@@ -8,10 +8,13 @@ Spooled events live under `SPOOL_DIR` and are retried before newly captured payl
 
 - Primary runtime: Docker backend usage daemon.
 - Event type: `codex.usage.snapshot`.
+- Agent health event type: `telemetry.agent.health`.
 - Node: `us-lax-pro-01`.
 - Hostname: `novix-lax-01`.
-- Health: `http://127.0.0.1:18081/healthz` from LAX only.
+- Local health: `http://127.0.0.1:18081/healthz` from LAX only.
+- Remote monitor health source: telemetry hub latest `telemetry.agent.health`.
 - Daily status command: `scripts/lax-agent-status.ps1`.
+- Agent health status command: `scripts/lax-agent-health-status.ps1`.
 - Logs command: `scripts/lax-agent-logs.ps1 -Tail 50`.
 - Canary report command: `scripts/lax-agent-canary-report.ps1`.
 - Rollback dry-run: `scripts/lax-agent-rollback.ps1`.
@@ -79,6 +82,7 @@ Hub latest check:
 
 ```bash
 curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/codex.usage.snapshot
+curl -fsS https://telemetry.jerryskywalker.space/v1/events/latest/telemetry.agent.health
 curl -fsS https://telemetry.jerryskywalker.space/v1/nodes/us-lax-pro-01/latest
 ```
 
@@ -86,8 +90,17 @@ Local health check from LAX only:
 
 ```bash
 curl -fsS http://127.0.0.1:18081/healthz
+curl -fsS http://127.0.0.1:18081/api/agent/health/latest
 curl -fsS http://127.0.0.1:18081/api/codex/usage/summary
 ```
+
+Guarded one-shot health upload:
+
+```powershell
+scripts/lax-agent-health-once.ps1 -ConfirmProductionUpload
+```
+
+This sends through the existing HMAC HTTP sink and must not print `.env`, node secrets, Codex tokens, or raw backend responses.
 
 All LAX daemon Compose commands must use:
 
