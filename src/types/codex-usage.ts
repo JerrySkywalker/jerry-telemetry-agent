@@ -4,15 +4,49 @@ export interface CodexRateWindow {
   window_seconds?: number;
   reset_at_epoch?: number;
   reset_at_iso?: string;
+  reset_in_seconds?: number;
+  reset_source?: SafeCodexLimitResetSource;
 }
 
 export interface CodexRateLimit {
   scope: "default" | "additional";
+  detail_source?: SafeCodexLimitSource;
   name: string;
   metered_feature?: string;
+  model?: string;
+  unit?: string;
+  total?: number;
+  used?: number;
+  remaining?: number;
   used_percent?: number;
   remaining_percent?: number;
   window?: CodexRateWindow;
+}
+
+export type SafeCodexLimitSource = "default" | "additional" | "credit" | "unknown";
+export type SafeCodexLimitStatus = "active" | "exhausted" | "unknown";
+export type SafeCodexLimitResetSource = "backend_absolute" | "backend_relative" | "derived_from_observed_at" | "not_reported";
+export type SafeCodexLimitCompleteness = "full" | "partial" | "not_reported";
+
+export interface SafeCodexLimitDetail {
+  key: string;
+  label: string;
+  source: SafeCodexLimitSource;
+  status: SafeCodexLimitStatus;
+  name: string | null;
+  metered_feature: string | null;
+  model: string | null;
+  unit: string | null;
+  total: number | null;
+  used: number | null;
+  remaining: number | null;
+  used_percent: number | null;
+  remaining_percent: number | null;
+  reset_at_iso: string | null;
+  reset_in_seconds: number | null;
+  window_seconds: number | null;
+  reset_source: SafeCodexLimitResetSource;
+  completeness: SafeCodexLimitCompleteness;
 }
 
 export interface CodexUsageSnapshot {
@@ -46,6 +80,8 @@ export interface CodexUsageSnapshot {
     http_status?: number;
   };
   limits: CodexRateLimit[];
+  limits_count: number;
+  limits_detail: SafeCodexLimitDetail[];
   credits?: {
     has_credits?: boolean;
     unlimited?: boolean;
@@ -56,7 +92,7 @@ export interface CodexUsageSnapshot {
   };
   spend_control?: {
     reached?: boolean;
-    individual_limit?: unknown | null;
+    individual_limit?: string | number | boolean | null;
   };
   raw_omitted_keys: string[];
 }
@@ -84,6 +120,10 @@ export interface CodexUsageSummary {
     reset_at_iso?: string;
   };
   additional_limits: CodexRateLimit[];
+  limits_count: number;
+  limits_detail: SafeCodexLimitDetail[];
+  default_limit_detail?: SafeCodexLimitDetail;
+  spark_limit_detail?: SafeCodexLimitDetail;
   credits?: {
     has_credits?: boolean;
     unlimited?: boolean;

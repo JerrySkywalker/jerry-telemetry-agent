@@ -61,6 +61,7 @@ function Assert-NoForbiddenMarker {
   $forbidden = @(
     ("access" + "_token"),
     ("refresh" + "_token"),
+    ("id" + "_token"),
     "email",
     "account_id",
     "user_id",
@@ -190,10 +191,12 @@ try {
   if ($snapshot.type -ne "codex.usage.snapshot") { throw "Smoke snapshot type mismatch." }
   if ($null -eq $snapshot.status -or $null -eq $snapshot.status.ok) { throw "Smoke snapshot is missing status.ok." }
   if (-not ($snapshot.limits -is [System.Collections.IEnumerable])) { throw "Smoke snapshot is missing limits array." }
+  if (-not ($snapshot.limits_detail -is [System.Collections.IEnumerable])) { throw "Smoke snapshot is missing limits_detail array." }
   if (-not $snapshot.observed_at) { throw "Smoke snapshot is missing observed_at." }
   if ($null -eq $snapshot.node -or -not $snapshot.node.id) { throw "Smoke snapshot is missing node.id." }
 
   $limits = @($snapshot.limits)
+  $limitsDetail = @($snapshot.limits_detail)
   $defaultLimit = @($limits | Where-Object { $_.scope -eq "default" -or $_.name -eq "default" })
   $sparkLimit = @($limits | Where-Object { $_.name -eq "GPT-5.3-Codex-Spark" })
   if ($limits.Count -gt 0) {
@@ -206,6 +209,18 @@ try {
     }
   }
 
+  $detailFieldsPresent = ($limitsDetail.Count -gt 0) -and (@($limitsDetail | Where-Object { $_.PSObject.Properties["completeness"] -and $_.PSObject.Properties["status"] }).Count -eq $limitsDetail.Count)
+  $resetCandidatePresent = @($limitsDetail | Where-Object {
+    ($_.PSObject.Properties["reset_at_iso"] -and $null -ne $_.reset_at_iso) -or
+    ($_.PSObject.Properties["reset_in_seconds"] -and $null -ne $_.reset_in_seconds) -or
+    ($_.PSObject.Properties["window_seconds"] -and $null -ne $_.window_seconds)
+  }).Count -gt 0
+  $absoluteUsageCandidatePresent = @($limitsDetail | Where-Object {
+    ($_.PSObject.Properties["total"] -and $null -ne $_.total) -or
+    ($_.PSObject.Properties["used"] -and $null -ne $_.used) -or
+    ($_.PSObject.Properties["remaining"] -and $null -ne $_.remaining)
+  }).Count -gt 0
+
   $rawOmittedKeys = if ($snapshot.raw_omitted_keys) { (@($snapshot.raw_omitted_keys) -join ",") } else { "" }
   Write-Host "auth_file_exists=$authFileExists"
   Write-Host "auth_file_length=$authFileLength"
@@ -217,6 +232,11 @@ try {
   Write-Host "error_code=$(Get-OptionalProperty -Value $snapshot.status -Name "error_code")"
   Write-Host "message=$(Get-OptionalProperty -Value $snapshot.status -Name "message")"
   Write-Host "limits_count=$($limits.Count)"
+  Write-Host "limits_detail_count=$($limitsDetail.Count)"
+  Write-Host "detail_fields_present=$detailFieldsPresent"
+  Write-Host "reset_candidate_present=$resetCandidatePresent"
+  Write-Host "absolute_usage_candidate_present=$absoluteUsageCandidatePresent"
+  Write-Host "secret_leak_detected=false"
   Write-Host "default_limit_found=$($defaultLimit.Count -gt 0)"
   Write-Host "spark_limit_found=$($sparkLimit.Count -gt 0)"
   Write-Host "raw_omitted_keys=$rawOmittedKeys"
