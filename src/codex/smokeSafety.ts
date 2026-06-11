@@ -6,6 +6,7 @@ export const SMOKE_FORBIDDEN_STRINGS = [
   "email",
   "account_id",
   "user_id",
+  "id_token",
   "referral_beacon",
   "promo"
 ] as const;
@@ -37,6 +38,7 @@ export function validateCodexUsageSmokeSnapshot(snapshot: unknown): SmokeValidat
     errors.push("status.ok is missing");
   }
   if (!Array.isArray(record.limits)) errors.push("limits is not an array");
+  if (!Array.isArray(record.limits_detail)) errors.push("limits_detail is not an array");
   if (typeof record.observed_at !== "string" || record.observed_at.length === 0) errors.push("observed_at is missing");
 
   const node = record.node;
@@ -52,6 +54,18 @@ export function validateCodexUsageSmokeSnapshot(snapshot: unknown): SmokeValidat
     const hasSparkText = serialized.includes("GPT-5.3-Codex-Spark");
     if (hasSparkText && !limits.some((limit) => limit.name === "GPT-5.3-Codex-Spark")) {
       errors.push("GPT-5.3-Codex-Spark appears outside limits");
+    }
+  }
+
+  if (Array.isArray(record.limits_detail)) {
+    for (const detail of record.limits_detail) {
+      if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+        errors.push("limits_detail contains a non-object item");
+        continue;
+      }
+      const item = detail as Record<string, unknown>;
+      if (typeof item.label !== "string" || item.label.length === 0) errors.push("limits_detail item label is missing");
+      if (typeof item.completeness !== "string") errors.push("limits_detail item completeness is missing");
     }
   }
 
