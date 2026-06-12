@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { sanitizeSnapshotPayload } from "./sanitize.js";
 
 export interface SpooledEvent {
   path: string;
@@ -10,7 +11,7 @@ export interface SpooledEvent {
 export async function spoolEvent(spoolDir: string, event: unknown): Promise<string> {
   await mkdir(spoolDir, { recursive: true });
   const file = path.join(spoolDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${crypto.randomUUID()}.json`);
-  await writeFile(file, `${JSON.stringify(event)}\n`, { mode: 0o600 });
+  await writeFile(file, `${JSON.stringify(sanitizeSnapshotPayload(event))}\n`, { mode: 0o600 });
   return file;
 }
 
@@ -20,7 +21,7 @@ export async function listSpooledEvents(spoolDir: string): Promise<SpooledEvent[
   const events: SpooledEvent[] = [];
   for (const name of names) {
     const file = path.join(spoolDir, name);
-    events.push({ path: file, event: JSON.parse(await readFile(file, "utf8")) as unknown });
+    events.push({ path: file, event: sanitizeSnapshotPayload(JSON.parse(await readFile(file, "utf8")) as unknown) });
   }
   return events;
 }

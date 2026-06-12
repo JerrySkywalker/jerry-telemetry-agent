@@ -41,5 +41,5 @@ services:
       # backend usage auth mount example:
       # - ~/.codex:/host-codex-home:ro
     ports:
-      - "127.0.0.1:${HEALTH_PORT:-8081}:8081"
+      - "127.0.0.1:${HEALTH_HOST_PORT:-18081}:8081"
     restart: unless-stopped

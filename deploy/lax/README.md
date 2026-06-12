@@ -23,3 +23,7 @@ volumes:
 ```
 
 Dry-run uses `AGENT_MODE=once` and `TELEMETRY_OUTPUT_MODE=stdout,file`; it must not include `http` or `TELEMETRY_NODE_SECRET`.
+
+Hotfix deployment should use `scripts/deploy-lax-agent-archive.ps1` after the fix is merged to `main`. The script creates a local `git archive` from `main`, copies it to LAX, backs up the current directory, preserves `.env`, `.env.*`, `logs/`, `state/`, `deploy/*/.env`, and `deploy/*/state/`, then builds through Docker Compose. It does not run npm on LAX.
+
+Safe diagnostics should use `scripts/diag-lax-agent-safe.ps1`. It reports only existence, mtime, key presence, type, counts, and marker presence.

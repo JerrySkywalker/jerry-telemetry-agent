@@ -1,5 +1,7 @@
 services:
   jerry-telemetry-agent:
+    build:
+      context: ../..
     image: jerry-telemetry-agent:latest
     restart: unless-stopped
     env_file:

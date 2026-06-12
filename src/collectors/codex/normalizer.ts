@@ -7,6 +7,7 @@ import type {
   SafeCodexLimitDetail,
   SafeCodexLimitResetSource
 } from "../../types/codex-usage.js";
+import { sanitizeTelemetryString } from "../../telemetry/sanitize.js";
 
 const COLLECTOR_VERSION = "1";
 const SENSITIVE_RAW_KEYS = new Set(["access_token", "refresh_token", "id_token", "email", "account_id", "user_id", "referral_beacon", "promo"]);
@@ -63,7 +64,7 @@ export function errorSnapshot(
   message: string,
   observedAt = new Date().toISOString(),
   stale = false,
-  diagnostics: { httpStatus?: number } = {}
+  diagnostics: { httpStatus?: number; authSource?: "auth_file"; authFilePresent?: boolean } = {}
 ): CodexUsageSnapshot {
   return {
     type: "codex.usage.snapshot",
@@ -80,9 +81,11 @@ export function errorSnapshot(
     status: {
       ok: false,
       error_code: errorCode,
-      message,
+      message: sanitizeTelemetryString(message),
       stale,
-      http_status: diagnostics.httpStatus
+      http_status: diagnostics.httpStatus,
+      auth_source: diagnostics.authSource,
+      auth_file_present: diagnostics.authFilePresent
     },
     limits: [],
     limits_count: 0,

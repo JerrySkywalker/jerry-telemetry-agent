@@ -10,6 +10,7 @@ import { startHealthServer } from "./health/server.js";
 import { buildAgentHealthSnapshot } from "./health/agentHealth.js";
 import { collectCodexUsage } from "./collectors/codex/index.js";
 import { writeSnapshotFile } from "./sinks/fileSink.js";
+import { sanitizeErrorForTelemetry, sanitizeSnapshotPayload } from "./telemetry/sanitize.js";
 import type { CodexUsageSnapshot } from "./types/codex-usage.js";
 
 async function sendOrDryRun(config: Config, event: unknown): Promise<void> {
@@ -40,66 +41,74 @@ export async function runOnce(config: Config): Promise<void> {
   let latestUsage: CodexUsageSnapshot | undefined;
   let usageError: unknown;
   let lastHttpErrorAt: string | undefined;
+  let retrySpoolErrorMessage: string | undefined;
 
   try {
     if (config.outputModes.includes("http")) {
       assertUploadConfig(config);
-      await retrySpool(config);
+      try {
+        await retrySpool(config);
+      } catch (error) {
+        lastHttpErrorAt = new Date().toISOString();
+        retrySpoolErrorMessage = sanitizeErrorForTelemetry(error, "spool_retry_error").message;
+        await updateState(config.statePath, { lastHttpErrorAt, lastError: retrySpoolErrorMessage });
+      }
     }
     const state = await readState(config.statePath);
     const snapshot = await collectCodexUsage(config, Boolean(state.lastSuccessfulUsageAt) || (await fileExists(config.usageLastGoodPath)));
-    latestUsage = snapshot;
+    latestUsage = sanitizeSnapshotPayload(snapshot);
     const hash = stablePayloadHash(snapshot);
 
-    await writeSnapshotFile(config.usageLatestPath, snapshot);
-    if (snapshot.status.ok) {
-      await writeSnapshotFile(config.usageLastGoodPath, snapshot);
+    await writeSnapshotFile(config.usageLatestPath, latestUsage);
+    if (latestUsage.status.ok) {
+      await writeSnapshotFile(config.usageLastGoodPath, latestUsage);
     }
     if (config.outputModes.includes("file")) {
-      await writeSnapshotFile(config.outputFile, snapshot);
+      await writeSnapshotFile(config.outputFile, latestUsage);
     }
     if (config.outputModes.includes("stdout")) {
-      process.stdout.write(`${JSON.stringify(snapshot)}\n`);
+      process.stdout.write(`${JSON.stringify(latestUsage)}\n`);
     }
 
     if (!config.forceSend && state.lastPayloadHash === hash) {
-      logger.info("skipping unchanged codex usage snapshot", { observedAt: snapshot.observed_at });
+      logger.info("skipping unchanged codex usage snapshot", { observedAt: latestUsage.observed_at });
       await updateState(config.statePath, {
-        lastPayloadCapturedAt: snapshot.observed_at,
-        lastError: undefined
+        lastPayloadCapturedAt: latestUsage.observed_at,
+        lastError: retrySpoolErrorMessage
       });
       return;
     }
 
     if (!config.outputModes.includes("http")) {
       await updateState(config.statePath, {
-        lastPayloadCapturedAt: snapshot.observed_at,
+        lastPayloadCapturedAt: latestUsage.observed_at,
         lastPayloadHash: hash,
-        lastSuccessfulUsageAt: snapshot.status.ok ? snapshot.observed_at : state.lastSuccessfulUsageAt,
-        lastError: snapshot.status.ok ? undefined : snapshot.status.message
+        lastSuccessfulUsageAt: latestUsage.status.ok ? latestUsage.observed_at : state.lastSuccessfulUsageAt,
+        lastError: latestUsage.status.ok ? retrySpoolErrorMessage : latestUsage.status.message
       });
       return;
     }
 
-    const event = buildEnvelope(config, snapshot as unknown as Record<string, unknown>, snapshot.observed_at);
+    const event = buildEnvelope(config, latestUsage as unknown as Record<string, unknown>, latestUsage.observed_at);
     try {
       await sendOrDryRun(config, event);
       await updateState(config.statePath, {
-        lastPayloadCapturedAt: snapshot.observed_at,
+        lastPayloadCapturedAt: latestUsage.observed_at,
         lastPayloadHash: hash,
-        lastSuccessfulUsageAt: snapshot.status.ok ? snapshot.observed_at : state.lastSuccessfulUsageAt,
+        lastSuccessfulUsageAt: latestUsage.status.ok ? latestUsage.observed_at : state.lastSuccessfulUsageAt,
         lastSuccessfulSendAt: new Date().toISOString(),
-        lastError: undefined
+        lastError: latestUsage.status.ok ? undefined : latestUsage.status.message
       });
     } catch (error) {
       lastHttpErrorAt = new Date().toISOString();
       await spoolEvent(config.spoolDir, event);
+      const safeError = sanitizeErrorForTelemetry(error, "http_upload_error");
       await updateState(config.statePath, {
-        lastPayloadCapturedAt: snapshot.observed_at,
+        lastPayloadCapturedAt: latestUsage.observed_at,
         lastPayloadHash: hash,
-        lastSuccessfulUsageAt: snapshot.status.ok ? snapshot.observed_at : state.lastSuccessfulUsageAt,
+        lastSuccessfulUsageAt: latestUsage.status.ok ? latestUsage.observed_at : state.lastSuccessfulUsageAt,
         lastHttpErrorAt,
-        lastError: (error as Error).message
+        lastError: safeError.message
       });
       throw error;
     }
@@ -143,10 +152,10 @@ async function emitAgentHealth(config: Config, latestUsage?: CodexUsageSnapshot,
         lastHttpErrorAt: errorAt,
         lastError: state.lastError
       });
-      logger.error("agent health event upload failed", { error: (error as Error).message });
+      logger.error("agent health event upload failed", { error: sanitizeErrorForTelemetry(error, "health_upload_error").message });
     }
   } catch (error) {
-    logger.error("agent health event failed", { error: (error as Error).message });
+    logger.error("agent health event failed", { error: sanitizeErrorForTelemetry(error, "health_event_error").message });
   }
 }
 
@@ -163,7 +172,20 @@ async function main(): Promise<void> {
   const config = loadConfig();
   if (process.argv.includes("--status")) {
     const state = await readState(config.statePath);
-    console.log(JSON.stringify({ collector: config.collectorMode, provider: config.provider, node_id: config.nodeId, hostname: config.hostname, state }, null, 2));
+    console.log(JSON.stringify({
+      collector: config.collectorMode,
+      provider: config.provider,
+      node_id: config.nodeId,
+      hostname: config.hostname,
+      state: {
+        lastPayloadCapturedAt: state.lastPayloadCapturedAt,
+        lastSuccessfulSendAt: state.lastSuccessfulSendAt,
+        lastSuccessfulUsageAt: state.lastSuccessfulUsageAt,
+        lastHealthEventAt: state.lastHealthEventAt,
+        lastHttpErrorAt: state.lastHttpErrorAt,
+        lastErrorPresent: Boolean(state.lastError)
+      }
+    }, null, 2));
     return;
   }
 
@@ -182,7 +204,7 @@ async function main(): Promise<void> {
     try {
       await runOnce(config);
     } catch (error) {
-      logger.error("agent iteration failed", { error: (error as Error).message });
+      logger.error("agent iteration failed", { error: sanitizeErrorForTelemetry(error, "agent_iteration_error").message });
     }
     await new Promise((resolve) => setTimeout(resolve, config.intervalSeconds * 1000));
   }
@@ -190,7 +212,7 @@ async function main(): Promise<void> {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    logger.error("agent failed", { error: (error as Error).message });
+    logger.error("agent failed", { error: sanitizeErrorForTelemetry(error, "agent_failed").message });
     process.exitCode = 1;
   });
 }

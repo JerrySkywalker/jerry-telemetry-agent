@@ -8,7 +8,8 @@ export const SMOKE_FORBIDDEN_STRINGS = [
   "user_id",
   "id_token",
   "referral_beacon",
-  "promo"
+  "promo",
+  "auth.json"
 ] as const;
 
 export interface SmokeValidationResult {

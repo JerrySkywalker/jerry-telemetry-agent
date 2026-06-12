@@ -5,6 +5,7 @@ import { FileProvider } from "../../providers/fileProvider.js";
 import { CodexUsageCollectionError, readCodexAuth } from "./auth-provider.js";
 import { fetchCodexUsage } from "./usage-client.js";
 import { errorSnapshot, fallbackSnapshot, normalizeCodexUsage } from "./normalizer.js";
+import { sanitizeErrorForTelemetry } from "../../telemetry/sanitize.js";
 
 export async function collectCodexUsage(config: Config, lastGoodExists = false): Promise<CodexUsageSnapshot> {
   if (config.collectorMode === "codex-cli-status-fallback") {
@@ -19,7 +20,8 @@ export async function collectCodexUsage(config: Config, lastGoodExists = false):
     if (error instanceof CodexUsageCollectionError) {
       return errorSnapshot(config, error.code, error.message, new Date().toISOString(), lastGoodExists, error.diagnostics);
     }
-    return errorSnapshot(config, "network_error", (error as Error).message, new Date().toISOString(), lastGoodExists);
+    const safeError = sanitizeErrorForTelemetry(error, "network_error");
+    return errorSnapshot(config, "network_error", safeError.message, new Date().toISOString(), lastGoodExists);
   }
 }
 

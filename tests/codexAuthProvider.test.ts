@@ -9,15 +9,23 @@ describe("Codex auth provider", () => {
     expect(resolveAuthJsonPath(testConfig({ codexHome: "/tmp/codex-home" }))).toBe(path.join("/tmp/codex-home", "auth.json"));
   });
 
-  it("reports auth_json_missing", async () => {
-    await expect(readCodexAuth(testConfig({ codexHome: await tempDir() }))).rejects.toMatchObject({ code: "auth_json_missing" });
+  it("reports safe auth unavailable diagnostics when the auth file is missing", async () => {
+    await expect(readCodexAuth(testConfig({ codexHome: await tempDir() }))).rejects.toMatchObject({
+      code: "codex_auth_unavailable",
+      message: "Codex auth unavailable",
+      diagnostics: { authSource: "auth_file", authFilePresent: false }
+    });
   });
 
-  it("reports access_token_missing", async () => {
+  it("reports safe auth unavailable diagnostics when the access token is missing", async () => {
     const dir = await tempDir();
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, "auth.json"), JSON.stringify({ tokens: { refresh_token: "secret" } }));
-    await expect(readCodexAuth(testConfig({ codexHome: dir }))).rejects.toMatchObject({ code: "access_token_missing" });
+    await expect(readCodexAuth(testConfig({ codexHome: dir }))).rejects.toMatchObject({
+      code: "codex_auth_unavailable",
+      message: "Codex auth unavailable",
+      diagnostics: { authSource: "auth_file", authFilePresent: true }
+    });
   });
 
   it("extracts current Codex tokens.access_token schema", async () => {
