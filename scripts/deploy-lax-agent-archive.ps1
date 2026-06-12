@@ -2,6 +2,7 @@ param(
   [string]$SshHost = "lax",
   [string]$ProjectDir = "~/jerry-telemetry-agent",
   [string]$Ref = "main",
+  [switch]$DryRun,
   [switch]$ConfirmDeploy
 )
 
@@ -19,9 +20,39 @@ foreach ($command in @("git", "ssh", "scp")) {
   }
 }
 
+$branch = (git branch --show-current).Trim()
+$dirty = git status --porcelain
+
 $archive = Join-Path ([IO.Path]::GetTempPath()) ("jerry-telemetry-agent-" + [Guid]::NewGuid().ToString("N") + ".tar")
 $remoteArchive = "/tmp/jerry-telemetry-agent-$([Guid]::NewGuid().ToString("N")).tar"
 $confirmValue = if ($ConfirmDeploy) { "1" } else { "0" }
+
+if ($DryRun) {
+  Write-Output "dry_run=true"
+  Write-Output "ref=$Ref"
+  Write-Output "current_branch=$branch"
+  Write-Output "worktree_clean=$(((-not $dirty)).ToString().ToLowerInvariant())"
+  Write-Output "archive_created=false"
+  Write-Output "archive_uploaded=false"
+  Write-Output "remote_project_dir=$ProjectDir"
+  Write-Output "lax_host_npm_required=false"
+  Write-Output "compose_uses_root_file=true"
+  Write-Output "compose_uses_deploy_env=true"
+  Write-Output "health_host_port_expected=18081"
+  Write-Output "health_container_port_expected=8081"
+  Write-Output "raw_backend_printed=false"
+  Write-Output "auth_json_printed=false"
+  Write-Output "secret_leak_detected=false"
+  exit 0
+}
+
+if ($Ref -eq "main" -and $branch -ne "main") {
+  throw "Production archive deploy must be run from local main when Ref=main. current_branch=$branch"
+}
+
+if ($dirty) {
+  throw "Production archive deploy requires a clean local worktree."
+}
 
 $remoteScript = @'
 set -eu
@@ -99,7 +130,7 @@ mv "$next_dir" "$project_dir"
 cd "$project_dir"
 export HEALTH_HOST_PORT="${HEALTH_HOST_PORT:-18081}"
 compose() {
-  docker compose --env-file .env -p jerry-telemetry-agent -f deploy/lax/docker-compose.yml.example "$@"
+  docker compose --env-file deploy/lax/.env -p jerry-telemetry-agent -f docker-compose.yml "$@"
 }
 
 compose_config_ok=false
@@ -123,9 +154,10 @@ done
 
 echo "backup_path=$backup_path"
 echo "compose_config_ok=$compose_config_ok"
-echo "agent_healthz_18081_ok=$agent_healthz_18081_ok"
+echo "healthz_18081_ok=$agent_healthz_18081_ok"
 echo "raw_backend_printed=false"
 echo "auth_json_printed=false"
+echo "secret_leak_detected=false"
 '@
 
 $localScript = Join-Path ([IO.Path]::GetTempPath()) ("deploy-lax-agent-archive-" + [Guid]::NewGuid().ToString("N") + ".sh")
@@ -136,12 +168,14 @@ try {
   if ($LASTEXITCODE -ne 0) {
     throw "git archive failed for ref $Ref"
   }
+  Write-Output "archive_created=true"
 
   [IO.File]::WriteAllText($localScript, ($remoteScript -replace "`r`n", "`n"), [Text.UTF8Encoding]::new($false))
   scp $archive "${SshHost}:$remoteArchive" | Out-Null
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to copy archive to LAX."
   }
+  Write-Output "archive_uploaded=true"
   scp $localScript "${SshHost}:$remoteScriptPath" | Out-Null
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to copy deploy script to LAX."
