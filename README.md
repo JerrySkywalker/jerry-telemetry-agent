@@ -52,6 +52,12 @@ npm run dev -- --once --collector codex-cli-status-fallback --provider file
 
 For LAX Docker backend usage mode, the host prerequisites are Docker and an installed/authenticated Codex CLI. The container mounts the host Codex auth directory read-only; it must not bake `auth.json` into the image. See [docs/LAX_BACKEND_USAGE_DOCKER_MIGRATION.md](docs/LAX_BACKEND_USAGE_DOCKER_MIGRATION.md).
 
+Production LAX deploy is archive plus Docker build, not git pull or npm on LAX. See [docs/ops/lax-agent-production-deploy.md](docs/ops/lax-agent-production-deploy.md), [docs/ops/lax-agent-diagnostics.md](docs/ops/lax-agent-diagnostics.md), and the MG020 Rescue postmortem at [docs/incidents/2026-06-12-mg020-rescue.md](docs/incidents/2026-06-12-mg020-rescue.md).
+
+Cross-project config and secret governance is tracked from this repo through [docs/governance/JERRY_CONFIG_GOVERNANCE_POINTER.md](docs/governance/JERRY_CONFIG_GOVERNANCE_POINTER.md).
+
+The old tmux/status chain is cold-archived as manual fallback only. See [docs/ops/old-codex-status-chain-cold-archive.md](docs/ops/old-codex-status-chain-cold-archive.md) and [docs/ops/manual-fallback-codex-status.md](docs/ops/manual-fallback-codex-status.md).
+
 LAX preparation commands:
 
 ```powershell
@@ -84,6 +90,7 @@ scripts/lax-agent-logs.ps1 -Tail 50
 scripts/lax-agent-canary-report.ps1
 scripts/lax-agent-rollback.ps1
 scripts/lax-old-fallback-status.ps1
+scripts/diag-lax-agent-safe.ps1
 ```
 
 Do not re-enable the old timer or delete old sender/collector files without a separate approved cleanup or rollback goal.
