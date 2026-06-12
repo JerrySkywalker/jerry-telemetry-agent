@@ -78,6 +78,8 @@ The health endpoint is bound only to localhost:
 127.0.0.1:18081:8081
 ```
 
+`HEALTH_PORT` is the container listener port and should normally stay `8081`. `HEALTH_HOST_PORT` is the LAX localhost port and defaults to `18081`.
+
 `TELEMETRY_OUTPUT_MODE=file,http` is documented for one-shot upload validation and final migration. Use `stdout,file` only for initial dry-run validation.
 
 ## Safe Docker Dry-Run
@@ -267,6 +269,7 @@ Daemon settings:
 - `HEALTH_SERVER_ENABLED=true`
 - `HEALTH_HOST=0.0.0.0`
 - `HEALTH_PORT=8081`
+- `HEALTH_HOST_PORT=18081`
 
 Required mounts:
 
@@ -362,11 +365,20 @@ The old `codex-status-telemetry.timer` remains untouched. Do not stop, enable, d
 Operational helpers:
 
 ```powershell
+scripts/diag-lax-agent-safe.ps1
 scripts/lax-agent-status.ps1
 scripts/lax-agent-logs.ps1 -Tail 100
 scripts/lax-agent-restart.ps1
 scripts/lax-agent-rollback.ps1
 ```
+
+Hotfix archive deployment:
+
+```powershell
+scripts/deploy-lax-agent-archive.ps1 -ConfirmDeploy
+```
+
+Use this only after the hotfix is merged to `main`. It deploys by local `git archive` plus `scp`, preserves `.env`, `.env.*`, `logs/`, `state/`, `deploy/*/.env`, and `deploy/*/state/`, and builds through Docker. It does not run npm on LAX and prints only safe status keys.
 
 ## Daemon Canary Result
 

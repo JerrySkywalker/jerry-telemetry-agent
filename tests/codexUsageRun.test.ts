@@ -51,8 +51,47 @@ describe("Codex usage runOnce sinks and last-good", () => {
     );
 
     const latest = JSON.parse(await readFile(path.join(dir, "latest.safe.snapshot.json"), "utf8"));
-    expect(latest).toMatchObject({ status: { ok: false, error_code: "access_token_missing", stale: true } });
+    expect(latest).toMatchObject({
+      status: {
+        ok: false,
+        error_code: "codex_auth_unavailable",
+        stale: true,
+        auth_source: "auth_file",
+        auth_file_present: true
+      }
+    });
+    expect(JSON.stringify(latest)).not.toContain("auth.json");
     expect(await readFile(lastGood, "utf8")).toContain("\"ok\":true");
+  });
+
+  it("writes a safe degraded usage snapshot when the auth file is missing", async () => {
+    const dir = await tempDir();
+    const latestPath = path.join(dir, "latest.safe.snapshot.json");
+
+    await runOnce(
+      testConfig({
+        outputModes: ["file"],
+        codexHome: path.join(dir, "missing-codex-home"),
+        outputFile: path.join(dir, "out.safe.snapshot.json"),
+        usageLatestPath: latestPath,
+        usageLastGoodPath: path.join(dir, "last-good.safe.snapshot.json"),
+        statePath: path.join(dir, "state.json")
+      })
+    );
+
+    const latestText = await readFile(latestPath, "utf8");
+    const latest = JSON.parse(latestText);
+    expect(latest).toMatchObject({
+      status: {
+        ok: false,
+        error_code: "codex_auth_unavailable",
+        message: "Codex auth unavailable",
+        auth_source: "auth_file",
+        auth_file_present: false
+      }
+    });
+    expect(latestText).not.toContain("auth.json");
+    expect(latestText).not.toContain(".codex");
   });
 
   it("wraps http sink as codex.usage.snapshot envelope", async () => {

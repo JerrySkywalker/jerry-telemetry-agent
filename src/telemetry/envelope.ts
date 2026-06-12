@@ -1,4 +1,5 @@
 import type { Config } from "../config.js";
+import { sanitizeSnapshotPayload } from "./sanitize.js";
 
 export interface TelemetryEnvelope {
   schema_version: "v1";
@@ -14,10 +15,11 @@ export interface TelemetryEnvelope {
 }
 
 export function buildEnvelope(config: Config, payload: Record<string, unknown>, capturedAt = new Date().toISOString()): TelemetryEnvelope {
+  const safePayload = sanitizeSnapshotPayload(payload);
   const eventType =
-    payload.type === "codex.usage.snapshot"
+    safePayload.type === "codex.usage.snapshot"
       ? "codex.usage.snapshot"
-      : payload.type === config.agentHealthEventType
+      : safePayload.type === config.agentHealthEventType
         ? config.agentHealthEventType
         : "codex.status";
   return {
@@ -30,12 +32,12 @@ export function buildEnvelope(config: Config, payload: Record<string, unknown>, 
       collector: config.collector
     },
     captured_at: capturedAt,
-    payload
+    payload: safePayload
   };
 }
 
 export function stablePayloadHash(payload: unknown): string {
-  return JSON.stringify(sortValue(payload));
+  return JSON.stringify(sortValue(sanitizeSnapshotPayload(payload)));
 }
 
 function sortValue(value: unknown): unknown {

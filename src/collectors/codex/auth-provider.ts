@@ -10,6 +10,7 @@ export interface CodexAuth {
 export class CodexUsageCollectionError extends Error {
   constructor(
     readonly code:
+      | "codex_auth_unavailable"
       | "auth_json_missing"
       | "access_token_missing"
       | "http_401"
@@ -20,7 +21,7 @@ export class CodexUsageCollectionError extends Error {
       | "network_error"
       | "schema_error",
     message: string,
-    readonly diagnostics: { httpStatus?: number; endpointFamily?: "wham_usage" } = {}
+    readonly diagnostics: { httpStatus?: number; endpointFamily?: "wham_usage"; authSource?: "auth_file"; authFilePresent?: boolean } = {}
   ) {
     super(message);
   }
@@ -37,7 +38,10 @@ export async function readCodexAuth(config: Pick<Config, "codexHome">): Promise<
     raw = await readFile(authPath, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new CodexUsageCollectionError("auth_json_missing", "Codex auth.json was not found");
+      throw new CodexUsageCollectionError("codex_auth_unavailable", "Codex auth unavailable", {
+        authSource: "auth_file",
+        authFilePresent: false
+      });
     }
     throw error;
   }
@@ -46,12 +50,18 @@ export async function readCodexAuth(config: Pick<Config, "codexHome">): Promise<
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new CodexUsageCollectionError("schema_error", "Codex auth.json is not valid JSON");
+    throw new CodexUsageCollectionError("codex_auth_unavailable", "Codex auth unavailable", {
+      authSource: "auth_file",
+      authFilePresent: true
+    });
   }
 
   const accessToken = findAccessToken(parsed);
   if (!accessToken) {
-    throw new CodexUsageCollectionError("access_token_missing", "Codex auth.json does not contain a ChatGPT access token");
+    throw new CodexUsageCollectionError("codex_auth_unavailable", "Codex auth unavailable", {
+      authSource: "auth_file",
+      authFilePresent: true
+    });
   }
   return { accessToken, authPath };
 }

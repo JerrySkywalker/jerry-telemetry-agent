@@ -75,6 +75,7 @@ Use [docs/CANARY_CHECKLIST.md](docs/CANARY_CHECKLIST.md) for 1 hour, 24 hour, an
 
 The LAX backend usage Docker daemon is the current primary Codex usage telemetry runtime. It emits `codex.usage.snapshot` for `us-lax-pro-01`; the old tmux/status chain is retained as manual fallback only.
 It also emits `telemetry.agent.health` for `us-lax-pro-01`; the local `/healthz` endpoint remains a localhost-only auxiliary check.
+In Docker Compose, `HEALTH_PORT` is the container listener port and defaults to `8081`; `HEALTH_HOST_PORT` is the host localhost port and defaults to `18081`, so the LAX health check is `http://127.0.0.1:18081/healthz`.
 
 ```powershell
 scripts/lax-agent-status.ps1

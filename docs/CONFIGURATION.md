@@ -30,7 +30,8 @@ Runtime:
 Health:
 - `HEALTH_SERVER_ENABLED=true`
 - `HEALTH_HOST=0.0.0.0`
-- `HEALTH_PORT=8081`
+- `HEALTH_PORT=8081` controls the container listener port.
+- `HEALTH_HOST_PORT=18081` controls the localhost host port in Docker Compose.
 
 Fallback:
 - `CODEX_STATUS_LATEST_PATH=/input/latest.json`

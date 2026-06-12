@@ -78,6 +78,8 @@ export interface CodexUsageSnapshot {
     message?: string;
     stale?: boolean;
     http_status?: number;
+    auth_source?: "auth_file";
+    auth_file_present?: boolean;
   };
   limits: CodexRateLimit[];
   limits_count: number;
@@ -98,6 +100,7 @@ export interface CodexUsageSnapshot {
 }
 
 export type CodexUsageErrorCode =
+  | "codex_auth_unavailable"
   | "auth_json_missing"
   | "access_token_missing"
   | "http_401"
