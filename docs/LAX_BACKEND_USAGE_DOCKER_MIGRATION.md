@@ -210,6 +210,8 @@ Current canary state:
 - `TELEMETRY_HOSTNAME=novix-lax-01`
 - `TELEMETRY_COLLECTOR=codex-backend-usage`
 - `TELEMETRY_OUTPUT_MODE=file,http`
+
+This LAX profile is one declarative collector profile for the multi-node agent. It remains compatible with env-only configuration; a future node may instead set `TELEMETRY_NODE_CONFIG_PATH` to a JSON file with node identity and allowlisted collectors. Unknown collector names fail closed, and shell-command collectors are not supported.
 - `CODEX_USAGE_POLL_INTERVAL_SECONDS=300`
 - Health is exposed only on LAX localhost: `127.0.0.1:18081->8081`.
 - The old `codex-status-telemetry.timer` should remain `disabled` and `inactive`.

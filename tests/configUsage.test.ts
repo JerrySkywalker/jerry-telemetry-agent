@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { assertUploadConfig } from "../src/config.js";
 import { defaultCodexHome, loadConfig } from "../src/config.js";
 
 describe("usage collector config", () => {
@@ -9,6 +13,10 @@ describe("usage collector config", () => {
     expect(config.intervalSeconds).toBe(300);
     expect(config.agentHealthEnabled).toBe(true);
     expect(config.agentHealthEventType).toBe("telemetry.agent.health");
+    expect(config.collectorConfigs).toEqual([
+      { name: "codex-backend-usage", enabled: true, interval_seconds: 300 },
+      { name: "agent-health", enabled: true, interval_seconds: 300 }
+    ]);
   });
 
   it("keeps once health opt-in unless requested", () => {
@@ -20,6 +28,64 @@ describe("usage collector config", () => {
   it("enables tmux fallback only when requested", () => {
     expect(loadConfig({ TELEMETRY_ENABLE_TMUX_FALLBACK: "true" }, []).collectorMode).toBe("codex-cli-status-fallback");
     expect(loadConfig({}, ["--collector", "codex-cli-status-fallback"]).collectorMode).toBe("codex-cli-status-fallback");
+  });
+
+  it("fails closed for unknown collector names", () => {
+    expect(() => loadConfig({ TELEMETRY_COLLECTOR_MODE: "shell" }, [])).toThrow(/Invalid collector name/);
+    expect(() => loadConfig({}, ["--collector", "shell"])).toThrow(/Invalid collector name/);
+  });
+
+  it("keeps env-only LAX backend usage compatible", () => {
+    const config = loadConfig(
+      {
+        TELEMETRY_NODE_ID: "us-lax-pro-01",
+        TELEMETRY_HOSTNAME: "novix-lax-01",
+        TELEMETRY_REGION: "us-lax",
+        TELEMETRY_OUTPUT_MODE: "file,http",
+        TELEMETRY_COLLECTOR_MODE: "codex-backend-usage"
+      },
+      []
+    );
+    expect(config.nodeId).toBe("us-lax-pro-01");
+    expect(config.hostname).toBe("novix-lax-01");
+    expect(config.region).toBe("us-lax");
+    expect(config.outputModes).toEqual(["file", "http"]);
+    expect(config.collectorMode).toBe("codex-backend-usage");
+  });
+
+  it("fails before HTTP upload when upload config is missing", () => {
+    const config = loadConfig({ TELEMETRY_OUTPUT_MODE: "file,http", TELEMETRY_NODE_ID: "us-lax-pro-01" }, []);
+    expect(() => assertUploadConfig(config)).toThrow(/TELEMETRY_HUB_URL, TELEMETRY_NODE_SECRET/);
+  });
+
+  it("loads declarative per-node config while preserving env overrides", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
+    const configPath = path.join(dir, "node.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        node_id: "us-lax-pro-01",
+        hostname: "novix-lax-01",
+        region: "us-lax",
+        role: "codex-node",
+        collectors: [
+          { name: "codex-backend-usage", enabled: true, interval_seconds: 300 },
+          { name: "agent-health", enabled: true, interval_seconds: 300 }
+        ]
+      })
+    );
+
+    const config = loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath, TELEMETRY_NODE_ID: "override-node" }, []);
+
+    expect(config.nodeId).toBe("override-node");
+    expect(config.hostname).toBe("novix-lax-01");
+    expect(config.region).toBe("us-lax");
+    expect(config.nodeRole).toBe("codex-node");
+    expect(config.collectorMode).toBe("codex-backend-usage");
+    expect(config.collectorConfigs).toEqual([
+      { name: "codex-backend-usage", enabled: true, interval_seconds: 300 },
+      { name: "agent-health", enabled: true, interval_seconds: 300 }
+    ]);
   });
 
   it("uses explicit CODEX_HOME when provided", () => {

@@ -1,9 +1,19 @@
 import os from "node:os";
 import path from "node:path";
+import { readFileSync } from "node:fs";
+import {
+  activeUsageCollectorFromConfig,
+  assertUsageCollectorName,
+  defaultCollectorConfigs,
+  parseDeclarativeNodeConfig,
+  type DeclarativeNodeConfig,
+  type NodeCollectorConfig,
+  type UsageCollectorName
+} from "./collectors/registry.js";
 
 export type AgentMode = "once" | "daemon";
 export type ProviderMode = "backend-usage" | "file" | "host-codex" | "container-codex";
-export type CollectorMode = "codex-backend-usage" | "codex-cli-status-fallback";
+export type CollectorMode = UsageCollectorName;
 export type OutputMode = "stdout" | "file" | "http";
 
 export interface Config {
@@ -23,8 +33,10 @@ export interface Config {
   nodeSecret: string;
   hostname: string;
   region: string;
-  collector: string;
+  collector: UsageCollectorName;
   collectorMode: CollectorMode;
+  collectorConfigs: NodeCollectorConfig[];
+  nodeConfigPath: string;
   accountLabel: string;
   nodeRole: string;
   platform: string;
@@ -78,11 +90,6 @@ function provider(value: string | undefined): ProviderMode {
   throw new Error(`Invalid CODEX_PROVIDER: ${value ?? ""}`);
 }
 
-function collector(value: string | undefined): CollectorMode {
-  if (value === "codex-backend-usage" || value === "codex-cli-status-fallback") return value;
-  throw new Error(`Invalid collector mode: ${value ?? ""}`);
-}
-
 function outputModes(value: string | undefined): OutputMode[] {
   const raw = value ?? "stdout";
   const modes = raw.split(",").map((item) => item.trim()).filter(Boolean);
@@ -102,21 +109,27 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
   const cliProvider = readFlag(args, "--provider");
   const cliCollector = readFlag(args, "--collector");
   const cliMode = hasFlag(args, "--once") ? "once" : hasFlag(args, "--daemon") ? "daemon" : undefined;
-  const collectorMode = collector(
+  const nodeConfig = loadDeclarativeConfig(env.TELEMETRY_NODE_CONFIG_PATH);
+  const configuredUsageCollector = activeUsageCollectorFromConfig(nodeConfig?.collectors);
+  const collectorMode = assertUsageCollectorName(
     cliCollector ??
       env.TELEMETRY_COLLECTOR_MODE ??
+      configuredUsageCollector ??
       (bool(env.TELEMETRY_ENABLE_TMUX_FALLBACK, false) ? "codex-cli-status-fallback" : "codex-backend-usage")
   );
   const statePath = env.STATE_PATH ?? "/state/agent-state.json";
   const agentMode = mode(cliMode ?? env.AGENT_MODE ?? "daemon");
-  const agentHealthDefault = agentMode === "daemon" || hasFlag(args, "--health");
+  const configAgentHealth = nodeConfig?.collectors?.find((item) => item.name === "agent-health")?.enabled;
+  const agentHealthDefault = configAgentHealth ?? (agentMode === "daemon" || hasFlag(args, "--health"));
+  const intervalSeconds = int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300);
+  const agentHealthEnabled = hasFlag(args, "--no-health") ? false : bool(env.TELEMETRY_AGENT_HEALTH_ENABLED, agentHealthDefault);
 
   return {
     mode: agentMode,
     dryRun: hasFlag(args, "--dry-run") || bool(env.DRY_RUN, false),
     provider: provider(cliProvider ?? env.CODEX_PROVIDER ?? "backend-usage"),
     outputModes: outputModes(env.TELEMETRY_OUTPUT_MODE),
-    intervalSeconds: int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300),
+    intervalSeconds,
     codexHome: defaultCodexHome(env),
     codexUsageEndpoint: env.CODEX_USAGE_ENDPOINT ?? "https://chatgpt.com/backend-api/wham/usage",
     codexStatusLatestPath: env.CODEX_STATUS_LATEST_PATH ?? "/input/latest.json",
@@ -124,14 +137,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     hostCodexHome: env.HOST_CODEX_HOME ?? "/host-codex-home",
     codexTmuxSession: env.CODEX_TMUX_SESSION ?? "codex-status-agent",
     hubUrl: env.TELEMETRY_HUB_URL ?? "",
-    nodeId: env.TELEMETRY_NODE_ID ?? "",
+    nodeId: env.TELEMETRY_NODE_ID ?? nodeConfig?.node_id ?? "",
     nodeSecret: env.TELEMETRY_NODE_SECRET ?? "",
-    hostname: env.TELEMETRY_HOSTNAME ?? os.hostname(),
-    region: env.TELEMETRY_REGION ?? "",
-    collector: env.TELEMETRY_COLLECTOR ?? collectorMode,
+    hostname: env.TELEMETRY_HOSTNAME ?? nodeConfig?.hostname ?? os.hostname(),
+    region: env.TELEMETRY_REGION ?? nodeConfig?.region ?? "",
+    collector: assertUsageCollectorName(env.TELEMETRY_COLLECTOR ?? collectorMode),
     collectorMode,
+    collectorConfigs: nodeConfig?.collectors ?? defaultCollectorConfigs(collectorMode, intervalSeconds, agentHealthEnabled),
+    nodeConfigPath: env.TELEMETRY_NODE_CONFIG_PATH ?? "",
     accountLabel: env.TELEMETRY_ACCOUNT_LABEL ?? "",
-    nodeRole: env.TELEMETRY_NODE_ROLE ?? "",
+    nodeRole: env.TELEMETRY_NODE_ROLE ?? nodeConfig?.role ?? "",
     platform: process.platform,
     outputFile: env.TELEMETRY_OUTPUT_FILE ?? "/state/codex-usage-latest.safe.snapshot.json",
     usageLatestPath: env.CODEX_USAGE_LATEST_PATH ?? "/state/codex-usage-latest.safe.snapshot.json",
@@ -142,11 +157,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     healthServerEnabled: bool(env.HEALTH_SERVER_ENABLED, false),
     healthHost: env.HEALTH_HOST ?? "0.0.0.0",
     healthPort: int(env.HEALTH_PORT, 8081),
-    agentHealthEnabled: hasFlag(args, "--no-health") ? false : bool(env.TELEMETRY_AGENT_HEALTH_ENABLED, agentHealthDefault),
+    agentHealthEnabled,
     agentHealthEventType: "telemetry.agent.health",
     agentHealthIntervalSeconds: int(env.TELEMETRY_AGENT_HEALTH_INTERVAL_SECONDS, int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300)),
     agentHealthOutputFile: env.TELEMETRY_AGENT_HEALTH_OUTPUT_FILE ?? "/state/agent-health-latest.safe.snapshot.json"
   };
+}
+
+function loadDeclarativeConfig(file: string | undefined): DeclarativeNodeConfig | undefined {
+  if (!file) return undefined;
+  return parseDeclarativeNodeConfig(JSON.parse(readFileSync(file, "utf8")) as unknown);
 }
 
 export function assertUploadConfig(config: Config): void {

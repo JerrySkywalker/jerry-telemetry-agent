@@ -50,15 +50,16 @@ export async function buildAgentHealthSnapshot(config: Config, context: AgentHea
       message: degraded ? "agent degraded" : "agent healthy"
     },
     collectors: [
-      {
-        name: config.collectorMode,
+      ...config.collectorConfigs.filter((item) => item.enabled && item.name !== "agent-health").map((item) => ({
+        name: item.name,
         enabled: true,
+        interval_seconds: item.interval_seconds ?? config.intervalSeconds,
         last_success_at: collectorLastSuccessAt,
         last_error_at: collectorLastErrorAt,
         last_error_code: collectorErrorCode,
         latest_payload_status_ok: latestUsage?.status.ok ?? null,
         latest_limits_count: latestUsage?.limits.length ?? null
-      }
+      }))
     ],
     outputs: {
       file_enabled: config.outputModes.includes("file"),
