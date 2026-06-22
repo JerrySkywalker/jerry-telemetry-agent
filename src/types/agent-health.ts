@@ -44,6 +44,7 @@ export interface AgentHealthSnapshot {
 export interface AgentHealthCollector {
   name: string;
   enabled: boolean;
+  interval_seconds?: number | null;
   last_success_at?: string | null;
   last_error_at?: string | null;
   last_error_code?: string | null;

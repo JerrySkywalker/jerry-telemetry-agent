@@ -4,6 +4,30 @@ Do not paste secrets, token-shaped values, raw `auth.json`, raw backend response
 
 Spooled events live under `SPOOL_DIR` and are retried before newly captured payloads.
 
+## Non-LAX Pilot Package
+
+The first non-LAX pilot package is local-only and health-only:
+
+- Node profile: `example-node-01`, `example-region`, `general-node`.
+- Node config: `deploy/examples/non-lax-agent-health.node.json`.
+- Env example: `deploy/examples/non-lax-pilot.env.example`.
+- Local smoke: `npm run build` then `npm run smoke:non-lax-pilot`.
+
+The smoke loads the example node config, runs once with `TELEMETRY_OUTPUT_MODE=file`, writes `telemetry.agent.health`, builds a local envelope for verification, and prints only booleans, counts, and safe status fields. It does not upload to the hub.
+
+## Future Target-Node Preflight
+
+A future read-only target-node preflight should check only:
+
+- Docker availability.
+- Docker Compose availability.
+- Disk free space and memory summary.
+- Ability to reach `https://telemetry.jerryskywalker.space/healthz`.
+- Local state directory existence and write permissions.
+- Absence of conflicting existing telemetry agent services or timers.
+
+The preflight must not print secrets, `.env`, tokens, Authorization headers, cookies, raw backend responses, account IDs, user IDs, or emails. It must not create services, edit timers, run `docker compose up`, deploy, or upload telemetry.
+
 ## Current Primary Runtime
 
 - Primary runtime: Docker backend usage daemon.

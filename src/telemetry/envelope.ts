@@ -1,9 +1,10 @@
 import type { Config } from "../config.js";
+import { collectorEventType, type CollectorEventType } from "../collectors/registry.js";
 import { sanitizeSnapshotPayload } from "./sanitize.js";
 
 export interface TelemetryEnvelope {
   schema_version: "v1";
-  event_type: "codex.status" | "codex.usage.snapshot" | "telemetry.agent.health";
+  event_type: CollectorEventType;
   source: {
     node_id: string;
     hostname: string;
@@ -16,12 +17,7 @@ export interface TelemetryEnvelope {
 
 export function buildEnvelope(config: Config, payload: Record<string, unknown>, capturedAt = new Date().toISOString()): TelemetryEnvelope {
   const safePayload = sanitizeSnapshotPayload(payload);
-  const eventType =
-    safePayload.type === "codex.usage.snapshot"
-      ? "codex.usage.snapshot"
-      : safePayload.type === config.agentHealthEventType
-        ? config.agentHealthEventType
-        : "codex.status";
+  const eventType = resolveEventType(config, safePayload);
   return {
     schema_version: "v1",
     event_type: eventType,
@@ -34,6 +30,16 @@ export function buildEnvelope(config: Config, payload: Record<string, unknown>, 
     captured_at: capturedAt,
     payload: safePayload
   };
+}
+
+function resolveEventType(config: Config, payload: Record<string, unknown>): CollectorEventType {
+  if (payload.type === "codex.usage.snapshot" || payload.type === config.agentHealthEventType) {
+    return payload.type;
+  }
+  if (typeof payload.type === "string") {
+    throw new Error(`Unsupported telemetry event type: ${payload.type}`);
+  }
+  return collectorEventType(config.collector);
 }
 
 export function stablePayloadHash(payload: unknown): string {

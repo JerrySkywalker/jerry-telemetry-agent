@@ -1,5 +1,14 @@
 # Providers And Collectors
 
+Collectors are selected through a typed allowlist. Implemented names are:
+- `codex-backend-usage`
+- `codex-cli-status-fallback`
+- `agent-health`
+
+Unknown collector names fail closed during config loading. Arbitrary shell command collectors are intentionally not supported. Additional collectors must be added to the registry with an explicit event type and safe payload contract before they can run.
+
+Non-LAX health-only pilots may enable only `agent-health`. In that configuration the agent skips Codex auth reads and backend usage collection, emits `telemetry.agent.health`, and can run with local file output only.
+
 ## codex-backend-usage
 
 Default and primary collector. Reads `CODEX_HOME/auth.json`, extracts a ChatGPT-managed `tokens.access_token` or another supported `access_token` schema, and calls `CODEX_USAGE_ENDPOINT`.
