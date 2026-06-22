@@ -2,10 +2,11 @@ import os from "node:os";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 import {
+  assertCollectorName,
   activeUsageCollectorFromConfig,
-  assertUsageCollectorName,
   defaultCollectorConfigs,
   parseDeclarativeNodeConfig,
+  type CollectorName,
   type DeclarativeNodeConfig,
   type NodeCollectorConfig,
   type UsageCollectorName
@@ -13,7 +14,7 @@ import {
 
 export type AgentMode = "once" | "daemon";
 export type ProviderMode = "backend-usage" | "file" | "host-codex" | "container-codex";
-export type CollectorMode = UsageCollectorName;
+export type CollectorMode = CollectorName;
 export type OutputMode = "stdout" | "file" | "http";
 
 export interface Config {
@@ -33,7 +34,7 @@ export interface Config {
   nodeSecret: string;
   hostname: string;
   region: string;
-  collector: UsageCollectorName;
+  collector: CollectorName;
   collectorMode: CollectorMode;
   collectorConfigs: NodeCollectorConfig[];
   nodeConfigPath: string;
@@ -111,11 +112,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
   const cliMode = hasFlag(args, "--once") ? "once" : hasFlag(args, "--daemon") ? "daemon" : undefined;
   const nodeConfig = loadDeclarativeConfig(env.TELEMETRY_NODE_CONFIG_PATH);
   const configuredUsageCollector = activeUsageCollectorFromConfig(nodeConfig?.collectors);
-  const collectorMode = assertUsageCollectorName(
+  const collectorMode = assertCollectorName(
     cliCollector ??
       env.TELEMETRY_COLLECTOR_MODE ??
       configuredUsageCollector ??
-      (bool(env.TELEMETRY_ENABLE_TMUX_FALLBACK, false) ? "codex-cli-status-fallback" : "codex-backend-usage")
+      (nodeConfig?.collectors ? "agent-health" : bool(env.TELEMETRY_ENABLE_TMUX_FALLBACK, false) ? "codex-cli-status-fallback" : "codex-backend-usage")
   );
   const statePath = env.STATE_PATH ?? "/state/agent-state.json";
   const agentMode = mode(cliMode ?? env.AGENT_MODE ?? "daemon");
@@ -141,9 +142,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     nodeSecret: env.TELEMETRY_NODE_SECRET ?? "",
     hostname: env.TELEMETRY_HOSTNAME ?? nodeConfig?.hostname ?? os.hostname(),
     region: env.TELEMETRY_REGION ?? nodeConfig?.region ?? "",
-    collector: assertUsageCollectorName(env.TELEMETRY_COLLECTOR ?? collectorMode),
+    collector: assertCollectorName(env.TELEMETRY_COLLECTOR ?? collectorMode),
     collectorMode,
-    collectorConfigs: nodeConfig?.collectors ?? defaultCollectorConfigs(collectorMode, intervalSeconds, agentHealthEnabled),
+    collectorConfigs: nodeConfig?.collectors ?? (collectorMode === "agent-health"
+      ? [{ name: "agent-health", enabled: true, interval_seconds: intervalSeconds }]
+      : defaultCollectorConfigs(collectorMode, intervalSeconds, agentHealthEnabled)),
     nodeConfigPath: env.TELEMETRY_NODE_CONFIG_PATH ?? "",
     accountLabel: env.TELEMETRY_ACCOUNT_LABEL ?? "",
     nodeRole: env.TELEMETRY_NODE_ROLE ?? nodeConfig?.role ?? "",

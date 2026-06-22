@@ -87,6 +87,26 @@ HTTP upload is enabled only when `TELEMETRY_OUTPUT_MODE` includes `http` and all
 
 Allowed collector names are `codex-backend-usage`, `codex-cli-status-fallback`, and `agent-health`. Unknown names fail closed at startup. Collector-specific configuration is typed by the registry; arbitrary shell command collectors are intentionally not supported.
 
+For a non-LAX pilot that does not collect Codex usage, enable only `agent-health`:
+
+```json
+{
+  "node_id": "example-node-01",
+  "hostname": "example-node-01",
+  "region": "example-region",
+  "role": "general-node",
+  "collectors": [
+    { "name": "agent-health", "enabled": true, "interval_seconds": 300 }
+  ]
+}
+```
+
+The checked-in examples are:
+- `deploy/examples/non-lax-agent-health.node.json`
+- `deploy/examples/non-lax-pilot.env.example`
+
+The example env keeps `TELEMETRY_OUTPUT_MODE=file` so the pilot runs locally without production upload. It includes `TELEMETRY_HUB_URL=https://telemetry.jerryskywalker.space/v1/events` for the future approved upload path, but HTTP output must not be enabled until a real node secret is manually supplied outside git.
+
 Env and CLI compatibility rules:
 - `--collector` overrides `TELEMETRY_COLLECTOR_MODE`.
 - `TELEMETRY_COLLECTOR_MODE` overrides the first enabled usage collector in the node config.

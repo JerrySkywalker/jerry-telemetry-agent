@@ -103,4 +103,42 @@ describe("agent health event", () => {
     expect(secondHealth.type).toBe("telemetry.agent.health");
     expect(Date.parse(secondHealth.observed_at)).toBeGreaterThanOrEqual(Date.parse(firstHealth.observed_at));
   });
+
+  it("runOnce supports an agent-health-only node without reading Codex usage inputs", async () => {
+    const dir = await tempDir();
+    const healthFile = path.join(dir, "agent-health.json");
+    await mkdir(path.join(dir, "spool"));
+
+    const config = testConfig({
+      nodeId: "example-node-01",
+      hostname: "example-node-01",
+      region: "example-region",
+      collector: "agent-health",
+      collectorMode: "agent-health",
+      collectorConfigs: [{ name: "agent-health", enabled: true, interval_seconds: 300 }],
+      agentHealthEnabled: true,
+      outputModes: ["file"],
+      codexHome: path.join(dir, "missing-codex-home"),
+      codexStatusLatestPath: path.join(dir, "missing-latest.json"),
+      outputFile: path.join(dir, "unused-usage-output.json"),
+      usageLatestPath: path.join(dir, "unused-usage-latest.json"),
+      usageLastGoodPath: path.join(dir, "unused-usage-last-good.json"),
+      agentHealthOutputFile: healthFile,
+      statePath: path.join(dir, "state.json"),
+      spoolDir: path.join(dir, "spool")
+    });
+
+    await runOnce(config);
+    const health = JSON.parse(await readFile(healthFile, "utf8")) as { type: string; status: { ok: boolean; degraded: boolean }; collectors: unknown[] };
+    const envelope = buildEnvelope(config, health as unknown as Record<string, unknown>, "2026-06-10T00:00:00.000Z");
+
+    expect(health.type).toBe("telemetry.agent.health");
+    expect(health.status).toMatchObject({ ok: true, degraded: false });
+    expect(health.collectors).toEqual([]);
+    expect(envelope).toMatchObject({
+      event_type: "telemetry.agent.health",
+      source: { node_id: "example-node-01", collector: "agent-health" }
+    });
+    await expect(readFile(config.usageLatestPath, "utf8")).rejects.toThrow();
+  });
 });

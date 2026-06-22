@@ -12,6 +12,7 @@ import { collectCodexUsage } from "./collectors/codex/index.js";
 import { writeSnapshotFile } from "./sinks/fileSink.js";
 import { sanitizeErrorForTelemetry, sanitizeSnapshotPayload } from "./telemetry/sanitize.js";
 import type { CodexUsageSnapshot } from "./types/codex-usage.js";
+import { isUsageCollectorName } from "./collectors/registry.js";
 
 async function sendOrDryRun(config: Config, event: unknown): Promise<void> {
   if (config.dryRun) {
@@ -53,6 +54,10 @@ export async function runOnce(config: Config): Promise<void> {
         retrySpoolErrorMessage = sanitizeErrorForTelemetry(error, "spool_retry_error").message;
         await updateState(config.statePath, { lastHttpErrorAt, lastError: retrySpoolErrorMessage });
       }
+    }
+    if (!hasEnabledUsageCollector(config)) {
+      await updateState(config.statePath, { lastError: retrySpoolErrorMessage });
+      return;
     }
     const state = await readState(config.statePath);
     const snapshot = await collectCodexUsage(config, Boolean(state.lastSuccessfulUsageAt) || (await fileExists(config.usageLastGoodPath)));
@@ -120,6 +125,10 @@ export async function runOnce(config: Config): Promise<void> {
       await emitAgentHealth(config, latestUsage, usageError, lastHttpErrorAt);
     }
   }
+}
+
+function hasEnabledUsageCollector(config: Config): boolean {
+  return config.collectorConfigs.some((item) => item.enabled && isUsageCollectorName(item.name));
 }
 
 async function emitAgentHealth(config: Config, latestUsage?: CodexUsageSnapshot, usageError?: unknown, lastHttpErrorAt?: string): Promise<void> {

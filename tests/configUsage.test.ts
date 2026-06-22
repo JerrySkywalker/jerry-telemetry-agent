@@ -88,6 +88,35 @@ describe("usage collector config", () => {
     ]);
   });
 
+  it("loads an agent-health-only non-LAX node config without selecting Codex usage", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
+    const configPath = path.join(dir, "node.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        node_id: "example-node-01",
+        hostname: "example-node-01",
+        region: "example-region",
+        role: "general-node",
+        collectors: [
+          { name: "agent-health", enabled: true, interval_seconds: 300 }
+        ]
+      })
+    );
+
+    const config = loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath, TELEMETRY_OUTPUT_MODE: "file" }, ["--once"]);
+
+    expect(config.nodeId).toBe("example-node-01");
+    expect(config.hostname).toBe("example-node-01");
+    expect(config.region).toBe("example-region");
+    expect(config.nodeRole).toBe("general-node");
+    expect(config.collectorMode).toBe("agent-health");
+    expect(config.collector).toBe("agent-health");
+    expect(config.collectorConfigs).toEqual([
+      { name: "agent-health", enabled: true, interval_seconds: 300 }
+    ]);
+  });
+
   it("uses explicit CODEX_HOME when provided", () => {
     expect(defaultCodexHome({ CODEX_HOME: "C:\\Users\\jerry\\.codex" }, "win32", "C:\\ignored")).toBe("C:\\Users\\jerry\\.codex");
   });

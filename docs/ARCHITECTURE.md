@@ -6,6 +6,8 @@ HTTP output wraps the normalized snapshot in the existing telemetry envelope, si
 
 Collector selection is typed and allowlisted by `src/collectors/registry.ts`. Implemented collector names are `codex-backend-usage`, `codex-cli-status-fallback`, and `agent-health`. Unknown names fail closed during config load. Arbitrary shell command collectors are intentionally not supported.
 
+Nodes are not required to collect Codex usage. A health-only node config can enable only `agent-health`; in that profile `runOnce` skips Codex usage collection and emits only `telemetry.agent.health` through local or approved sinks.
+
 Core modules:
 - collectors/codex: auth lookup, backend usage client, normalizer, fallback adapter.
 - collectors/registry: typed collector allowlist and per-node collector config validation.

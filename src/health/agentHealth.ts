@@ -20,7 +20,8 @@ export async function buildAgentHealthSnapshot(config: Config, context: AgentHea
   const observedAt = new Date().toISOString();
   const pendingSpoolCount = await countSpooledEvents(config.spoolDir);
   const latestUsage = context.latestUsage;
-  const collectorOk = latestUsage?.status.ok ?? false;
+  const usageCollectors = config.collectorConfigs.filter((item) => item.enabled && item.name !== "agent-health");
+  const collectorOk = usageCollectors.length === 0 ? true : latestUsage?.status.ok ?? false;
   const collectorErrorCode = context.collectorErrorCode ?? latestUsage?.status.error_code ?? null;
   const collectorLastSuccessAt = latestUsage?.status.ok ? latestUsage.observed_at : context.state.lastSuccessfulUsageAt ?? null;
   const collectorLastErrorAt = collectorErrorCode ? context.collectorErrorAt ?? latestUsage?.observed_at ?? observedAt : null;
@@ -50,7 +51,7 @@ export async function buildAgentHealthSnapshot(config: Config, context: AgentHea
       message: degraded ? "agent degraded" : "agent healthy"
     },
     collectors: [
-      ...config.collectorConfigs.filter((item) => item.enabled && item.name !== "agent-health").map((item) => ({
+      ...usageCollectors.map((item) => ({
         name: item.name,
         enabled: true,
         interval_seconds: item.interval_seconds ?? config.intervalSeconds,
