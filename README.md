@@ -59,6 +59,15 @@ For a local Hub that is already running at `http://127.0.0.1:3000`, fixture push
 
 The local batch contains `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, `custom.snapshot`, and `telemetry.agent.health`. It writes only sanitized JSON and prints only safe status fields.
 
+For real local Hub+Agent E2E without manually supplied dev credentials, keep sibling repos at `V:\src\jerry-telemetry-agent` and `V:\src\jerry-telemetry-hub` and run:
+
+```powershell
+.\scripts\smoke-local-hub-agent-e2e.ps1 -Mode Once
+.\scripts\smoke-local-hub-agent-e2e.ps1 -Mode Daemon
+```
+
+The harness starts the sibling Hub as a temporary localhost process, uses a temporary SQLite database under `.smoke`, generates local-only write/read credentials in memory, pushes real batches to `/v1/events/batch`, verifies `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom`, scans logs/output for forbidden markers, and stops the Hub process.
+
 For the generic Linux server collector package:
 
 ```powershell

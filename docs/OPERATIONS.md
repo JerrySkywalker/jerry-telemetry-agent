@@ -34,6 +34,29 @@ Fixture push to an already-running local Hub:
 
 Push mode posts a safe batch to `/v1/events/batch`. With a read token it verifies readback from `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom`, and prints only concise status fields. If Hub is not running or dev credentials are absent, `scripts/smoke-local-agent-e2e.ps1` reports a safe failure or skip.
 
+## Local Sibling Hub+Agent E2E
+
+Use this when both local repositories are present and you want a real Hub ingest/readback smoke without manually supplying secrets:
+
+```powershell
+.\scripts\smoke-local-hub-agent-e2e.ps1 -Mode Once
+.\scripts\smoke-local-hub-agent-e2e.ps1 -Mode Daemon
+```
+
+The script:
+
+- resolves `..\jerry-telemetry-hub` by default
+- starts Hub on `127.0.0.1`
+- uses a temporary SQLite path under `.smoke`
+- generates local-only write/read credentials in memory
+- configures Hub with child-process-only env vars
+- posts to `/v1/events/batch`
+- verifies `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom`
+- scans Hub and agent logs for forbidden markers and generated credential values
+- stops the temporary Hub process in cleanup
+
+`-Mode Once` also verifies safe negative cases: bad write secret, missing read token, and Hub unavailable. The output is PASS/FAIL/SKIP lines only and does not print generated credentials, HMAC signatures, Authorization headers, raw request bodies, or raw response bodies.
+
 ## Linux Server Batch Validation
 
 The server one-shot workflow prepares future Linux server telemetry without deployment:

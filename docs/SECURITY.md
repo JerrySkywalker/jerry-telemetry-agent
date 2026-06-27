@@ -25,6 +25,8 @@
 - Local readback tokens are for server-side/local test scripts only. Do not embed static read tokens in browser, mobile, watch, dashboard, or push-notification bundles.
 - The non-LAX pilot examples use placeholder-only configuration and default to file output. HTTP upload requires a manually supplied node secret from outside git.
 - Server daemon examples are placeholder-only, default to file output, bind health to localhost, and require explicit local/development credentials before HTTP upload.
+- The local sibling Hub+Agent E2E harness generates write/read credentials in memory, passes them only through child-process environment variables, never prints them, never writes them to reusable config files, and scans logs/output for generated credential values.
+- The local sibling Hub+Agent E2E harness starts Hub from a safe working directory and sets `DOTENV_CONFIG_PATH` to a non-existent run-local path so the Hub repository `.env` is not used.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.
 
 ## Repository Guardrails
@@ -43,4 +45,5 @@
 - Local smoke scripts write only normalized safe snapshots and must not upload to the telemetry hub.
 - Local one-shot batch smokes write only safe batch JSON and may upload only to an explicitly supplied local Hub URL with a manually supplied dev secret.
 - Server daemon smokes run file-only with bounded iterations and do not require Hub credentials.
+- Local sibling Hub E2E smokes use only temporary localhost Hub processes and temporary SQLite files under `.smoke`; they do not deploy or alter production runtime.
 - LAX production systemd timers remain unchanged until explicit manual approval.

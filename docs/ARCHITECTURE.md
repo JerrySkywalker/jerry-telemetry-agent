@@ -10,6 +10,8 @@ Nodes are not required to collect Codex usage. A health-only node config can ena
 
 The local one-shot batch path is separate from the LAX daemon path. It can run on Windows without Codex auth, produce fixture or local Windows node telemetry, write a safe batch file, optionally push to a local Hub, and optionally verify readback from `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom`.
 
+The local Hub+Agent E2E harness is a two-repository development workflow. It runs from the agent repository, discovers the sibling `jerry-telemetry-hub` repository, starts `dist/app/main.js` as a temporary localhost process with child-process-only environment variables, generates ephemeral write/read credentials in memory, writes a temporary SQLite database under `.smoke`, runs agent once or bounded server daemon batch upload against the real Hub `/v1/events/batch`, verifies readback APIs, scans logs for forbidden markers and generated credential values, then stops the Hub process. It does not edit Hub source files and does not use the Hub repo `.env`.
+
 The server one-shot path builds a Hub-compatible v1 batch from declarative Linux server collectors. The generic server daemon reuses that batch builder in a loop, retries spooled batches before collecting a new batch, writes latest/file outputs, uploads batches through the HMAC batch endpoint when enabled, and spools sanitized failed batches for later retry. Collector failures become safe degraded payloads and agent-health status rather than crashing the whole batch, while invalid config still fails closed.
 
 The generic server daemon is implemented in `src/serverDaemon.ts` and launched by `src/server-agent-daemon.ts` or `scripts/server-agent-daemon.ps1`. It intentionally does not replace the LAX Codex daemon path in `src/main.ts`; the existing Codex single-event spool/retry behavior remains compatible.
@@ -33,3 +35,4 @@ Core modules:
 - telemetry: envelope, batch, HMAC, uploader, state, and single-event/batch spool.
 - sinks: stdout/file output for normalized snapshots and safe server batches.
 - health: optional local health/status HTTP server plus Codex and server summary endpoints.
+- localHubE2E: local-only sibling Hub process harness and readback verifier.
