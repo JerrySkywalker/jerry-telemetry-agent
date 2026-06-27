@@ -2,7 +2,7 @@
 
 Do not paste secrets, token-shaped values, raw `auth.json`, raw backend responses, `.env`, or `.env.bak.*` contents into issues, PRs, docs, or chat.
 
-Spooled events live under `SPOOL_DIR` and are retried before newly captured payloads.
+Spooled events live under `SPOOL_DIR` and are retried before newly captured payloads. The Codex daemon keeps its existing single-event spool behavior. The generic server daemon uses separate batch spool files, retries oldest batch files before new batches, quarantines invalid batch files, and keeps failed retry files for a later interval.
 
 ## Local One-Shot Batch Testing
 
@@ -52,6 +52,39 @@ Read-only target preflight template:
 ```
 
 The preflight script prints Linux command templates for Docker, Compose, disk, memory, Hub health, state directory, and conflict checks. It does not SSH, create services, edit timers, run Compose, upload telemetry, or print secrets.
+
+## Generic Server Daemon Validation
+
+The generic server daemon is local/development-only in this goal and does not replace the current LAX Codex daemon:
+
+```powershell
+.\scripts\server-agent-daemon.ps1 -Config .\deploy\examples\general-linux-agent.node.json -Output FileOnly -MaxIterations 2 -IntervalSeconds 1
+.\scripts\smoke-server-daemon.ps1
+```
+
+File-only daemon validation writes:
+
+- latest safe batch: `TELEMETRY_SERVER_BATCH_LATEST_FILE`
+- optional file output: `TELEMETRY_BATCH_OUTPUT_FILE`
+- safe state: `STATE_PATH`
+- sanitized failed batch spool files: `SPOOL_DIR`
+
+HTTP daemon mode is for local Hub testing or future approved deployment only:
+
+```powershell
+.\scripts\server-agent-daemon.ps1 -Output Push -HubUrl http://127.0.0.1:3000/v1/events -WriteSecret <dev-secret> -MaxIterations 2
+```
+
+The script does not print the write secret, HMAC signature, raw request body, headers, or Hub response body. If the local health server is enabled, keep it localhost/private and use:
+
+```text
+/healthz
+/status
+/api/server/status
+/api/server/batch/latest
+```
+
+Deployment templates live under `deploy/examples/` and are placeholders only. Do not install, enable, start, stop, restart, or edit production services from this goal.
 
 ## Non-LAX Pilot Package
 

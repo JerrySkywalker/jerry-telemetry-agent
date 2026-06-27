@@ -9,6 +9,9 @@
 - Payloads that still contain unredacted account or session identifiers are rejected.
 - HTTP output sends only the normalized `codex.usage.snapshot` inside the hub envelope.
 - Batch output sends only v1 telemetry envelopes under `{ schema_version: "v1", events: [...] }` to Hub `/v1/events/batch`.
+- Generic server daemon batch spool files contain only sanitized Hub-compatible batch JSON. They do not contain HMAC signatures, headers, node secrets, raw request bodies, or raw response bodies.
+- Generic server daemon state contains only summary fields such as timestamps, counts, event types, node identity, collector names, and spool counts. It does not contain raw payloads.
+- Generic server daemon CLI status output exposes booleans, counts, and timestamps only. `/api/server/status` exposes a richer localhost-only safe summary, and `/api/server/batch/latest` returns a summary instead of raw payloads.
 - Agent health output sends only safe booleans, counts, timestamps, and string categories inside `telemetry.agent.health`. It records sensitive categories in `raw_omitted_keys` but never includes secret values, raw env, Authorization headers, raw `auth.json`, account ids, or raw backend responses.
 - Collector names and event types are allowlisted by the typed registry. Unknown collector names fail closed, and arbitrary shell command collectors are intentionally not supported.
 - Event envelopes only accept registry-approved event types: `codex.usage.snapshot`, `telemetry.agent.health`, `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, `docker.containers.snapshot`, `systemd.units.snapshot`, and `custom.snapshot`.
@@ -21,6 +24,7 @@
 - Hardened custom JSON output is controlled to name, status, message, observed timestamp, tags, and sanitized `safe_values` only when explicitly marked safe.
 - Local readback tokens are for server-side/local test scripts only. Do not embed static read tokens in browser, mobile, watch, dashboard, or push-notification bundles.
 - The non-LAX pilot examples use placeholder-only configuration and default to file output. HTTP upload requires a manually supplied node secret from outside git.
+- Server daemon examples are placeholder-only, default to file output, bind health to localhost, and require explicit local/development credentials before HTTP upload.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.
 
 ## Repository Guardrails
@@ -38,4 +42,5 @@
 - The Docker image must not contain `auth.json` or any copied Codex credential material.
 - Local smoke scripts write only normalized safe snapshots and must not upload to the telemetry hub.
 - Local one-shot batch smokes write only safe batch JSON and may upload only to an explicitly supplied local Hub URL with a manually supplied dev secret.
+- Server daemon smokes run file-only with bounded iterations and do not require Hub credentials.
 - LAX production systemd timers remain unchanged until explicit manual approval.

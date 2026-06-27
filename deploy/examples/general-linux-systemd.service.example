@@ -1,0 +1,20 @@
+[Unit]
+Description=Jerry Telemetry Agent generic Linux daemon
+Documentation=README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/jerry-telemetry-agent
+EnvironmentFile=/etc/jerry-telemetry-agent/general-linux-daemon.env
+ExecStart=/usr/bin/node /opt/jerry-telemetry-agent/dist/server-agent-daemon.js
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/jerry-telemetry-agent
+
+[Install]
+WantedBy=multi-user.target

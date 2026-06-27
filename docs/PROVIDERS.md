@@ -19,6 +19,8 @@ Non-LAX health-only pilots may enable only `agent-health`. In that configuration
 
 Local generic server testing may enable the local collectors without Codex auth. These collectors are allowlisted by name and do not support arbitrary shell commands.
 
+The generic server daemon uses the same allowlisted server collectors as `server:once`. It is launched through `npm run server:daemon` or `scripts/server-agent-daemon.ps1`, retries batch spool files before new batches, and posts only HMAC-signed v1 batches to Hub `/v1/events/batch` when HTTP output is enabled.
+
 ## codex-backend-usage
 
 Default and primary collector. Reads `CODEX_HOME/auth.json`, extracts a ChatGPT-managed `tokens.access_token` or another supported `access_token` schema, and calls `CODEX_USAGE_ENDPOINT`.

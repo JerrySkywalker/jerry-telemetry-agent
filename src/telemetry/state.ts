@@ -12,6 +12,20 @@ export interface AgentState {
   lastSuccessfulHealthSendAt?: string;
   lastHttpErrorAt?: string;
   lastError?: string;
+  lastServerBatchCapturedAt?: string;
+  lastServerBatchEventTypes?: string[];
+  lastServerBatchEventsCount?: number;
+  lastServerBatchFile?: string;
+  lastServerBatchSuccessfulSendAt?: string;
+  lastServerBatchHttpErrorAt?: string;
+  lastServerBatchError?: string;
+  pendingSpoolCount?: number;
+  pendingBatchSpoolCount?: number;
+  daemonStartedAt?: string;
+  daemonMode?: "codex" | "server";
+  nodeId?: string;
+  hostname?: string;
+  collectorNames?: string[];
 }
 
 export async function readState(statePath: string): Promise<AgentState> {
