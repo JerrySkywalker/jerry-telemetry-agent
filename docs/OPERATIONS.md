@@ -129,6 +129,23 @@ The install, upgrade, and uninstall scripts render plans only. They write local 
 - [ops/agent-install-upgrade-rollback.md](ops/agent-install-upgrade-rollback.md)
 - [ops/agent-production-safety-checklist.md](ops/agent-production-safety-checklist.md)
 
+## Telemetry Stack Release Candidate Gate
+
+Before asking for explicit production deployment authorization, run the cross-repo local RC gate from this Agent repository:
+
+```powershell
+.\scripts\stack-doctor-local.ps1 -HubRepoPath ..\jerry-telemetry-hub
+.\scripts\stack-release-candidate-local.ps1 -HubRepoPath ..\jerry-telemetry-hub
+```
+
+The stack gate validates the sibling Hub and Agent together, runs both local release gates, reruns Once and Daemon Agent to Hub E2E, packages the Agent artifact, and writes local reports under `.smoke\stack-rc`. It does not deploy, change servers, alter production runtimes, or add consumer apps.
+
+See:
+
+- [ops/telemetry-stack-release-candidate.md](ops/telemetry-stack-release-candidate.md)
+- [ops/telemetry-stack-operator-handoff.md](ops/telemetry-stack-operator-handoff.md)
+- [ops/telemetry-stack-production-authorization.md](ops/telemetry-stack-production-authorization.md)
+
 ## Non-LAX Pilot Package
 
 The first non-LAX pilot package is local-only and health-only:
