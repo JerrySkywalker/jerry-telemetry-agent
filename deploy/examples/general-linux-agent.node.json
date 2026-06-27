@@ -1,0 +1,43 @@
+{
+  "node_id": "example-linux-01",
+  "hostname": "example-linux-01",
+  "region": "local",
+  "role": "general-linux-node",
+  "provider": "local",
+  "collectors": [
+    { "name": "node-info", "enabled": true, "interval_seconds": 60 },
+    { "name": "node-resources", "enabled": true, "interval_seconds": 60 },
+    {
+      "name": "http-probe",
+      "enabled": true,
+      "targets": [
+        { "name": "local-hub-health", "url": "http://127.0.0.1:3000/healthz", "timeout_ms": 2000 }
+      ]
+    },
+    {
+      "name": "tcp-probe",
+      "enabled": true,
+      "targets": [
+        { "name": "ssh-local", "host": "127.0.0.1", "port": 22, "timeout_ms": 1000 }
+      ]
+    },
+    {
+      "name": "docker-containers",
+      "enabled": true,
+      "allowlist": ["jerry-*", "nginx", "openresty"]
+    },
+    {
+      "name": "systemd-units",
+      "enabled": true,
+      "units": ["docker.service", "nginx.service"]
+    },
+    {
+      "name": "custom-json",
+      "enabled": true,
+      "files": [
+        { "name": "example", "path": "deploy/examples/custom/example.safe.json" }
+      ]
+    },
+    { "name": "agent-health", "enabled": true, "interval_seconds": 60 }
+  ]
+}

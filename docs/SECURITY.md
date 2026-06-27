@@ -11,9 +11,14 @@
 - Batch output sends only v1 telemetry envelopes under `{ schema_version: "v1", events: [...] }` to Hub `/v1/events/batch`.
 - Agent health output sends only safe booleans, counts, timestamps, and string categories inside `telemetry.agent.health`. It records sensitive categories in `raw_omitted_keys` but never includes secret values, raw env, Authorization headers, raw `auth.json`, account ids, or raw backend responses.
 - Collector names and event types are allowlisted by the typed registry. Unknown collector names fail closed, and arbitrary shell command collectors are intentionally not supported.
-- Event envelopes only accept registry-approved event types: `codex.usage.snapshot`, `telemetry.agent.health`, `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, and `custom.snapshot`.
+- Event envelopes only accept registry-approved event types: `codex.usage.snapshot`, `telemetry.agent.health`, `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, `docker.containers.snapshot`, `systemd.units.snapshot`, and `custom.snapshot`.
 - Local node-info and node-resources collectors do not read Codex auth, browser stores, cookie stores, `.env`, or user directories. Disk summaries use only generic drive or mount labels plus total/free/used percentages.
 - Local service-health and custom-json collectors use fixture/static file inputs only. Custom JSON files are limited to 64 KiB, recursively sanitized, and summarized unless explicitly marked safe.
+- HTTP probes emit only safe status, response time, status code, and a sanitized URL without credentials, query strings, fragments, headers, or response bodies.
+- TCP probes emit only safe status, response time, and port for explicitly configured single host/port targets. They do not scan ranges or dump DNS data.
+- Docker status uses read-only container listing and emits no environment variables, mounts, raw inspect JSON, secrets, labels by default, or host paths.
+- Systemd status uses read-only unit status for configured units only and emits no journal logs, ExecStart command lines, or environment data.
+- Hardened custom JSON output is controlled to name, status, message, observed timestamp, tags, and sanitized `safe_values` only when explicitly marked safe.
 - Local readback tokens are for server-side/local test scripts only. Do not embed static read tokens in browser, mobile, watch, dashboard, or push-notification bundles.
 - The non-LAX pilot examples use placeholder-only configuration and default to file output. HTTP upload requires a manually supplied node secret from outside git.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.

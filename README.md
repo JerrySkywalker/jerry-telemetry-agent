@@ -59,6 +59,16 @@ For a local Hub that is already running at `http://127.0.0.1:3000`, fixture push
 
 The local batch contains `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, `custom.snapshot`, and `telemetry.agent.health`. It writes only sanitized JSON and prints only safe status fields.
 
+For the generic Linux server collector package:
+
+```powershell
+.\scripts\server-agent-once.ps1 -Config .\deploy\examples\general-linux-agent.node.json -Output FileOnly -OutFile .smoke\server.batch.safe.json
+.\scripts\smoke-server-agent.ps1
+.\scripts\preflight-linux-agent.ps1
+```
+
+The server batch path adds HTTP/TCP probes, Docker container status, systemd unit status, and hardened custom JSON on top of node info and resource snapshots. Docker and systemd collectors are read-only and degrade safely when unavailable. The preflight script prints read-only Linux command templates only; it does not SSH, deploy, upload telemetry, or start/stop services.
+
 For migration fallback file mode:
 
 ```powershell
