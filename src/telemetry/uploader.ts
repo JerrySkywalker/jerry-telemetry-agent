@@ -1,21 +1,54 @@
 import type { Config } from "../config.js";
 import { signTelemetryBody } from "./hmac.js";
 
+export interface TelemetryUploadConfig {
+  hubUrl: string;
+  hubBatchUrl?: string;
+  nodeId: string;
+  nodeSecret: string;
+  nodeKeyId?: string;
+}
+
 export interface UploadResult {
   status: number;
   ok: boolean;
   body: string;
 }
 
-export async function uploadEvent(config: Config, event: unknown): Promise<UploadResult> {
-  const rawBody = JSON.stringify(event);
-  const headers = signTelemetryBody(config.nodeId, config.nodeSecret, rawBody);
-  const response = await fetch(config.hubUrl, {
+export async function uploadEvent(config: Pick<Config, "hubUrl" | "nodeId" | "nodeSecret" | "nodeKeyId">, event: unknown): Promise<UploadResult> {
+  return uploadSignedJson(config.hubUrl, config, event);
+}
+
+export async function uploadBatch(config: TelemetryUploadConfig, batch: unknown): Promise<UploadResult> {
+  return uploadSignedJson(resolveBatchHubUrl(config), config, batch);
+}
+
+export function resolveBatchHubUrl(config: Pick<TelemetryUploadConfig, "hubUrl" | "hubBatchUrl">): string {
+  const explicit = config.hubBatchUrl?.trim();
+  if (explicit) return explicit;
+
+  const eventUrl = config.hubUrl.trim();
+  if (eventUrl.endsWith("/v1/events")) {
+    return `${eventUrl.slice(0, -"/v1/events".length)}/v1/events/batch`;
+  }
+
+  throw new Error("Missing TELEMETRY_HUB_BATCH_URL; TELEMETRY_HUB_URL must end with /v1/events to derive the batch endpoint");
+}
+
+async function uploadSignedJson(url: string, config: Pick<TelemetryUploadConfig, "nodeId" | "nodeSecret" | "nodeKeyId">, payload: unknown): Promise<UploadResult> {
+  const rawBody = JSON.stringify(payload);
+  const signedHeaders = signTelemetryBody(config.nodeId, config.nodeSecret, rawBody);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...signedHeaders
+  };
+  if (config.nodeKeyId) {
+    headers["X-Telemetry-Key-Id"] = config.nodeKeyId;
+  }
+
+  const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...headers
-    },
+    headers,
     body: rawBody
   });
   const body = await response.text();

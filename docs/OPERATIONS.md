@@ -4,6 +4,36 @@ Do not paste secrets, token-shaped values, raw `auth.json`, raw backend response
 
 Spooled events live under `SPOOL_DIR` and are retried before newly captured payloads.
 
+## Local One-Shot Batch Testing
+
+This workflow is for local Windows and fixture validation before server deployment. It does not deploy, SSH, start or stop services, alter LAX runtime, or modify the production Hub.
+
+Fixture file-only:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode Fixture -Output FileOnly -NodeId local-win-dev-01 -OutFile .smoke\fixture.batch.safe.json
+```
+
+Local Windows file-only:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode LocalWindows -Output FileOnly -NodeId local-win-dev-01 -OutFile .smoke\local.batch.safe.json
+```
+
+Local smoke:
+
+```powershell
+.\scripts\smoke-local-agent.ps1
+```
+
+Fixture push to an already-running local Hub:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode Fixture -Output Push -HubUrl http://127.0.0.1:3000 -NodeId sample-node -WriteSecret <dev-secret> -ReadToken <dev-read-token>
+```
+
+Push mode posts a safe batch to `/v1/events/batch`. With a read token it verifies readback from `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom`, and prints only concise status fields. If Hub is not running or dev credentials are absent, `scripts/smoke-local-agent-e2e.ps1` reports a safe failure or skip.
+
 ## Non-LAX Pilot Package
 
 The first non-LAX pilot package is local-only and health-only:

@@ -4,10 +4,16 @@ Collectors are selected through a typed allowlist. Implemented names are:
 - `codex-backend-usage`
 - `codex-cli-status-fallback`
 - `agent-health`
+- `node-info`
+- `node-resources`
+- `service-health`
+- `custom-json`
 
 Unknown collector names fail closed during config loading. Arbitrary shell command collectors are intentionally not supported. Additional collectors must be added to the registry with an explicit event type and safe payload contract before they can run.
 
 Non-LAX health-only pilots may enable only `agent-health`. In that configuration the agent skips Codex auth reads and backend usage collection, emits `telemetry.agent.health`, and can run with local file output only.
+
+Local generic server testing may enable the local collectors without Codex auth. These collectors are allowlisted by name and do not support arbitrary shell commands.
 
 ## codex-backend-usage
 
@@ -41,6 +47,22 @@ The container starts tmux, runs Codex, sends `/status`, captures the pane, redac
 ## container-codex
 
 Reserved for a future container-installed Codex command. The provider interface already supports adding it.
+
+## node-info
+
+Generic server snapshot collector. Emits `node.snapshot` with only node id, hostname, region, role, provider, platform, OS, kernel, architecture, uptime seconds, and agent version.
+
+## node-resources
+
+Generic resource snapshot collector. Emits `node.resources.snapshot` with memory totals/free/percent, load averages where available, uptime, nullable CPU/process metrics when not safely available, and disk summaries limited to generic drive or mount labels plus total/free/used percentages.
+
+## service-health
+
+Fixture/static service-health collector. Emits `service.health.snapshot` with an allowlisted `services` array: name, kind, status, last check, message, response time, and non-sensitive port. It must not emit URLs with credentials, request headers, response bodies, logs, or environment data.
+
+## custom-json
+
+Fixture/file custom collector. Emits `custom.snapshot` from a local path supplied by config, CLI, or environment. Files are limited to 64 KiB. Arbitrary JSON is summarized by type/count/size unless the file is explicitly marked safe with a top-level `safe: true` and `data` object; safe data is still recursively sanitized.
 
 ## LAX backend usage Docker mode
 
