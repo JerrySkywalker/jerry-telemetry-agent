@@ -100,6 +100,15 @@ For local deployment readiness without deploying:
 
 These scripts write local `.smoke` plans/artifacts only. They do not deploy, SSH, copy to servers, start services, stop services, restart services, edit timers, or render real secret values. See [docs/ops/agent-deployment-readiness.md](docs/ops/agent-deployment-readiness.md).
 
+For a local release-candidate check of Agent plus the sibling Hub repository:
+
+```powershell
+.\scripts\stack-doctor-local.ps1 -HubRepoPath ..\jerry-telemetry-hub
+.\scripts\stack-release-candidate-local.ps1 -HubRepoPath ..\jerry-telemetry-hub
+```
+
+The stack RC gate runs only local checks, writes reports under `.smoke\stack-rc`, and does not deploy or mutate production services. See [docs/ops/telemetry-stack-release-candidate.md](docs/ops/telemetry-stack-release-candidate.md).
+
 For migration fallback file mode:
 
 ```powershell
