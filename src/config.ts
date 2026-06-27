@@ -47,8 +47,12 @@ export interface Config {
   outputFile: string;
   usageLatestPath: string;
   usageLastGoodPath: string;
+  serverBatchLatestFile: string;
+  serverBatchOutputFile: string;
   statePath: string;
   spoolDir: string;
+  spoolMaxFiles: number;
+  spoolMaxBytes: number;
   forceSend: boolean;
   healthServerEnabled: boolean;
   healthHost: string;
@@ -159,8 +163,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     outputFile: env.TELEMETRY_OUTPUT_FILE ?? "/state/codex-usage-latest.safe.snapshot.json",
     usageLatestPath: env.CODEX_USAGE_LATEST_PATH ?? "/state/codex-usage-latest.safe.snapshot.json",
     usageLastGoodPath: env.CODEX_USAGE_LAST_GOOD_PATH ?? "/state/codex-usage-last-good.safe.snapshot.json",
+    serverBatchLatestFile: env.TELEMETRY_SERVER_BATCH_LATEST_FILE ?? env.TELEMETRY_BATCH_OUTPUT_FILE ?? "/state/server-batch-latest.safe.json",
+    serverBatchOutputFile: env.TELEMETRY_BATCH_OUTPUT_FILE ?? env.TELEMETRY_SERVER_BATCH_LATEST_FILE ?? "/state/server-batch.safe.json",
     statePath,
     spoolDir: env.SPOOL_DIR ?? "/state/spool",
+    spoolMaxFiles: int(env.SPOOL_MAX_FILES, 100),
+    spoolMaxBytes: int(env.SPOOL_MAX_BYTES, 10 * 1024 * 1024),
     forceSend: bool(env.FORCE_SEND, false),
     healthServerEnabled: bool(env.HEALTH_SERVER_ENABLED, false),
     healthHost: env.HEALTH_HOST ?? "0.0.0.0",

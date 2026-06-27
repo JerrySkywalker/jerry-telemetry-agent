@@ -69,6 +69,15 @@ For the generic Linux server collector package:
 
 The server batch path adds HTTP/TCP probes, Docker container status, systemd unit status, and hardened custom JSON on top of node info and resource snapshots. Docker and systemd collectors are read-only and degrade safely when unavailable. The preflight script prints read-only Linux command templates only; it does not SSH, deploy, upload telemetry, or start/stop services.
 
+For the generic server daemon in bounded local file-only mode:
+
+```powershell
+.\scripts\server-agent-daemon.ps1 -Config .\deploy\examples\general-linux-agent.node.json -Output FileOnly -MaxIterations 2 -IntervalSeconds 1
+.\scripts\smoke-server-daemon.ps1
+```
+
+The server daemon repeatedly builds the same Hub-compatible v1 server batch, writes safe latest/file outputs, retries spooled batches before new uploads, and spools sanitized failed batch uploads. It is separate from the existing LAX Codex daemon in `src/main.ts`; LAX Codex usage behavior remains unchanged.
+
 For migration fallback file mode:
 
 ```powershell
@@ -124,6 +133,8 @@ Do not re-enable the old timer or delete old sender/collector files without a se
 Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_SECRET`, access tokens, refresh tokens, raw `auth.json`, or raw backend usage responses.
 
 Local one-shot batch testing is a development workflow only. It does not deploy, change LAX services, modify the production Hub, add dashboard code, or create mobile/watch/notification consumers.
+
+Generic server daemon testing is also local/development-only in this goal. The checked-in daemon examples are placeholders and do not deploy or alter production services.
 
 ## Development Workflow
 

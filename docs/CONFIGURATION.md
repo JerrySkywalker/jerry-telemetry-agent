@@ -30,6 +30,8 @@ Runtime:
 - `CODEX_PROVIDER=backend-usage|file|host-codex|container-codex`
 - `STATE_PATH=/state/agent-state.json`
 - `SPOOL_DIR=/state/spool`
+- `SPOOL_MAX_FILES=100`
+- `SPOOL_MAX_BYTES=10485760`
 - `FORCE_SEND=false`
 - `TELEMETRY_NODE_ID`
 - `TELEMETRY_NODE_ROLE`
@@ -37,12 +39,14 @@ Runtime:
 - `TELEMETRY_CUSTOM_JSON_PATH` optional local custom-json fixture/file path, max 64 KiB.
 - `TELEMETRY_SERVICE_HEALTH_PATH` optional local service-health fixture/static file path.
 - `TELEMETRY_BATCH_OUTPUT_FILE=.smoke/telemetry-batch.safe.json`
+- `TELEMETRY_SERVER_BATCH_LATEST_FILE=/state/server-batch-latest.safe.json`
 
 Health:
 - `HEALTH_SERVER_ENABLED=true`
 - `HEALTH_HOST=0.0.0.0`
 - `HEALTH_PORT=8081` controls the container listener port.
 - `HEALTH_HOST_PORT=18081` controls the localhost host port in Docker Compose.
+- Generic server daemon summaries are available at `/api/server/status` and `/api/server/batch/latest` when the local health server is enabled. Example templates bind the health port to localhost/private interfaces only.
 
 Fallback:
 - `CODEX_STATUS_LATEST_PATH=/input/latest.json`
@@ -117,6 +121,32 @@ Read-only Linux preflight template:
 ```
 
 The server one-shot path uses `npm run server:once` under the wrapper script. It writes a v1 batch for Hub `/v1/events/batch`, but file output is the default validation mode.
+
+## Server Daemon Examples
+
+Bounded local file-only daemon run:
+
+```powershell
+.\scripts\server-agent-daemon.ps1 -Config .\deploy\examples\general-linux-agent.node.json -Output FileOnly -MaxIterations 2 -IntervalSeconds 1
+```
+
+Daemon smoke:
+
+```powershell
+.\scripts\smoke-server-daemon.ps1
+```
+
+NPM entrypoint:
+
+```powershell
+npm run server:daemon -- --config .\deploy\examples\general-linux-agent.node.json --output-mode file --max-iterations 2
+```
+
+HTTP batch daemon mode uses `TELEMETRY_OUTPUT_MODE=file,http`, `TELEMETRY_HUB_URL` ending in `/v1/events` or explicit `TELEMETRY_HUB_BATCH_URL`, and `TELEMETRY_NODE_SECRET` supplied outside git. The daemon retries sanitized batch spool files before uploading a newly collected batch.
+
+Safe daemon state fields include batch timestamps, event types, event count, latest batch file path, upload success/error timestamps, pending spool counts, daemon mode, node id, hostname, and collector names. State does not include secrets, raw event payloads, response bodies, logs, or environment values. The daemon `--status` CLI prints only booleans, counts, and timestamps; use localhost-only `/api/server/status` for the richer safe summary.
+
+Batch spool limits are controlled by `SPOOL_MAX_FILES` and `SPOOL_MAX_BYTES`. When exceeded, the daemon drops oldest batch spool files and records a safe status; it never stores headers, signatures, secrets, or raw responses in spool files.
 
 `codex-backend-usage` is the primary collector. `codex-cli-status-fallback` and tmux `/status` capture are migration fallbacks only and remain disabled by default.
 

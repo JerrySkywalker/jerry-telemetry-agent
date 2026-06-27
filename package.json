@@ -15,6 +15,7 @@
     "smoke:local-agent": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-local-agent.ps1",
     "agent:once": "tsx src/agent-once.ts",
     "server:once": "tsx src/server-agent-once.ts",
+    "server:daemon": "tsx src/server-agent-daemon.ts",
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts"
   },

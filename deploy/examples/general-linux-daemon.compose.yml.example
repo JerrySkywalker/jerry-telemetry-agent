@@ -1,0 +1,24 @@
+services:
+  jerry-telemetry-agent:
+    image: jerry-telemetry-agent:latest
+    restart: unless-stopped
+    env_file:
+      - general-linux-daemon.env
+    environment:
+      AGENT_MODE: daemon
+      TELEMETRY_OUTPUT_MODE: ${TELEMETRY_OUTPUT_MODE:-file}
+      TELEMETRY_NODE_CONFIG_PATH: /config/general-linux-agent.node.json
+      TELEMETRY_SERVER_BATCH_LATEST_FILE: ${TELEMETRY_SERVER_BATCH_LATEST_FILE:-/state/server-batch-latest.safe.json}
+      TELEMETRY_BATCH_OUTPUT_FILE: ${TELEMETRY_BATCH_OUTPUT_FILE:-/state/server-batch.safe.json}
+      STATE_PATH: ${STATE_PATH:-/state/agent-state.json}
+      SPOOL_DIR: ${SPOOL_DIR:-/state/spool}
+      HEALTH_SERVER_ENABLED: ${HEALTH_SERVER_ENABLED:-true}
+      HEALTH_HOST: 127.0.0.1
+      HEALTH_PORT: ${HEALTH_PORT:-8081}
+    volumes:
+      - ./general-linux-agent.node.json:/config/general-linux-agent.node.json:ro
+      - ./custom:/app/deploy/examples/custom:ro
+      - ./state:/state
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:${HEALTH_HOST_PORT:-18082}:8081"
