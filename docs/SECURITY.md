@@ -27,6 +27,8 @@
 - Server daemon examples are placeholder-only, default to file output, bind health to localhost, and require explicit local/development credentials before HTTP upload.
 - The local sibling Hub+Agent E2E harness generates write/read credentials in memory, passes them only through child-process environment variables, never prints them, never writes them to reusable config files, and scans logs/output for generated credential values.
 - The local sibling Hub+Agent E2E harness starts Hub from a safe working directory and sets `DOTENV_CONFIG_PATH` to a non-existent run-local path so the Hub repository `.env` is not used.
+- Deployment-readiness scripts render only local plans/artifacts, report secret presence as booleans, and never render real env files with secret values.
+- Package validation excludes `.env`, `.env.*`, `auth.json`, state, logs, `.smoke`, `node_modules`, raw snapshots, generated credentials, and backups from local artifacts.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.
 
 ## Repository Guardrails

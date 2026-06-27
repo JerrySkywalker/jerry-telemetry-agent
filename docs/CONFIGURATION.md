@@ -178,6 +178,22 @@ Safe daemon state fields include batch timestamps, event types, event count, lat
 
 Batch spool limits are controlled by `SPOOL_MAX_FILES` and `SPOOL_MAX_BYTES`. When exceeded, the daemon drops oldest batch spool files and records a safe status; it never stores headers, signatures, secrets, or raw responses in spool files.
 
+## Config Doctor
+
+Use the local config doctor before packaging or manual deployment:
+
+```powershell
+.\scripts\doctor-agent-config.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+```
+
+Strict production-style validation requires an env file supplied outside git:
+
+```powershell
+.\scripts\doctor-agent-config.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json -EnvPath .smoke\strict-production.local.env -StrictProduction -NoNetwork
+```
+
+The doctor reports booleans, counts, statuses, and missing variable names only. It does not print secret values, raw env contents, Codex auth paths, HMAC signatures, Authorization headers, cookies, raw request bodies, or backend raw responses.
+
 `codex-backend-usage` is the primary collector. `codex-cli-status-fallback` and tmux `/status` capture are migration fallbacks only and remain disabled by default.
 
 ## Declarative Node Config

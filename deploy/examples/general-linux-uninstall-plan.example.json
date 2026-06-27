@@ -1,0 +1,19 @@
+{
+  "action": "uninstall",
+  "dry_run_only": true,
+  "production_mutation": false,
+  "plan": [
+    "PLAN ONLY - not executed: stop service after manual approval",
+    "PLAN ONLY - not executed: disable service after manual approval",
+    "PLAN ONLY - not executed: remove systemd unit after approval",
+    "PLAN ONLY - not executed: remove app files only after approval"
+  ],
+  "state": {
+    "preserve_by_default": true,
+    "delete_state_by_default": false
+  },
+  "secrets": {
+    "delete_by_default": false,
+    "render_values": false
+  }
+}
