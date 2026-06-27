@@ -109,6 +109,26 @@ The script does not print the write secret, HMAC signature, raw request body, he
 
 Deployment templates live under `deploy/examples/` and are placeholders only. Do not install, enable, start, stop, restart, or edit production services from this goal.
 
+## Deployment Readiness Gate
+
+Before any future manually approved deployment, run:
+
+```powershell
+.\scripts\release-gate-local.ps1
+.\scripts\package-agent-local.ps1
+.\scripts\doctor-agent-config.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\install-agent-dry-run.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\upgrade-agent-dry-run.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\uninstall-agent-dry-run.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+```
+
+The install, upgrade, and uninstall scripts render plans only. They write local `.smoke` output and do not run SSH, remote copy, service, timer, or Compose mutation commands. See:
+
+- [ops/agent-deployment-readiness.md](ops/agent-deployment-readiness.md)
+- [ops/agent-release-gate.md](ops/agent-release-gate.md)
+- [ops/agent-install-upgrade-rollback.md](ops/agent-install-upgrade-rollback.md)
+- [ops/agent-production-safety-checklist.md](ops/agent-production-safety-checklist.md)
+
 ## Non-LAX Pilot Package
 
 The first non-LAX pilot package is local-only and health-only:

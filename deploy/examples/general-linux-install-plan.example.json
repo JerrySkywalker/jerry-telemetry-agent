@@ -1,0 +1,28 @@
+{
+  "action": "install",
+  "dry_run_only": true,
+  "production_mutation": false,
+  "expected_directories": [
+    "/opt/jerry-telemetry-agent",
+    "/var/lib/jerry-telemetry-agent",
+    "/var/log/jerry-telemetry-agent",
+    "/opt/jerry-telemetry-agent/config",
+    "/var/lib/jerry-telemetry-agent/spool"
+  ],
+  "expected_files": [
+    "/opt/jerry-telemetry-agent/package.json",
+    "/opt/jerry-telemetry-agent/dist/src/server-agent-daemon.js",
+    "/opt/jerry-telemetry-agent/deploy/examples/general-linux-agent.node.json"
+  ],
+  "command_plan": [
+    "PLAN ONLY - not executed: create service user",
+    "PLAN ONLY - not executed: copy validated artifact",
+    "PLAN ONLY - not executed: render systemd unit",
+    "PLAN ONLY - not executed: run file-only smoke",
+    "PLAN ONLY - not executed: wait for manual approval before any service start"
+  ],
+  "secrets": {
+    "render_secret_values": false,
+    "secret_source": "operator-managed file outside git"
+  }
+}

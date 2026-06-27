@@ -1,0 +1,31 @@
+{
+  "schema_version": "agent-deployment-manifest.example.v1",
+  "deployment_kind": "generic-linux-server-agent",
+  "deployment_state": "placeholder_only",
+  "node_config_path": "deploy/examples/general-linux-agent.node.json",
+  "env_example_path": "deploy/examples/general-linux-daemon.env.example",
+  "output_mode_default": "file",
+  "http_upload": {
+    "enabled_by_default": false,
+    "hub_event_url_placeholder": "http://127.0.0.1:3000/v1/events",
+    "secret_source": "operator-managed file outside git",
+    "key_id_source": "optional operator-managed value outside git"
+  },
+  "paths": {
+    "install_root": "/opt/jerry-telemetry-agent",
+    "state_dir": "/var/lib/jerry-telemetry-agent",
+    "log_dir": "/var/log/jerry-telemetry-agent",
+    "config_dir": "/etc/jerry-telemetry-agent"
+  },
+  "health": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8081
+  },
+  "safety": {
+    "dry_run_only": true,
+    "production_mutation": false,
+    "requires_manual_approval_before_deploy": true,
+    "arbitrary_shell_collectors_supported": false
+  }
+}

@@ -36,3 +36,4 @@ Core modules:
 - sinks: stdout/file output for normalized snapshots and safe server batches.
 - health: optional local health/status HTTP server plus Codex and server summary endpoints.
 - localHubE2E: local-only sibling Hub process harness and readback verifier.
+- deployment: local-only config doctor and dry-run deployment plan rendering.

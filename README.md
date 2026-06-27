@@ -87,6 +87,19 @@ For the generic server daemon in bounded local file-only mode:
 
 The server daemon repeatedly builds the same Hub-compatible v1 server batch, writes safe latest/file outputs, retries spooled batches before new uploads, and spools sanitized failed batch uploads. It is separate from the existing LAX Codex daemon in `src/main.ts`; LAX Codex usage behavior remains unchanged.
 
+For local deployment readiness without deploying:
+
+```powershell
+.\scripts\doctor-agent-config.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\install-agent-dry-run.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\upgrade-agent-dry-run.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\uninstall-agent-dry-run.ps1 -NodeConfigPath .\deploy\examples\general-linux-agent.node.json
+.\scripts\package-agent-local.ps1
+.\scripts\release-gate-local.ps1
+```
+
+These scripts write local `.smoke` plans/artifacts only. They do not deploy, SSH, copy to servers, start services, stop services, restart services, edit timers, or render real secret values. See [docs/ops/agent-deployment-readiness.md](docs/ops/agent-deployment-readiness.md).
+
 For migration fallback file mode:
 
 ```powershell
@@ -144,6 +157,13 @@ Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_S
 Local one-shot batch testing is a development workflow only. It does not deploy, change LAX services, modify the production Hub, add dashboard code, or create mobile/watch/notification consumers.
 
 Generic server daemon testing is also local/development-only in this goal. The checked-in daemon examples are placeholders and do not deploy or alter production services.
+
+Deployment-readiness docs:
+
+- [docs/ops/agent-deployment-readiness.md](docs/ops/agent-deployment-readiness.md)
+- [docs/ops/agent-release-gate.md](docs/ops/agent-release-gate.md)
+- [docs/ops/agent-install-upgrade-rollback.md](docs/ops/agent-install-upgrade-rollback.md)
+- [docs/ops/agent-production-safety-checklist.md](docs/ops/agent-production-safety-checklist.md)
 
 ## Development Workflow
 

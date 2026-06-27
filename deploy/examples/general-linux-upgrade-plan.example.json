@@ -1,0 +1,19 @@
+{
+  "action": "upgrade",
+  "dry_run_only": true,
+  "production_mutation": false,
+  "current_version": "unknown-render-only",
+  "target_version_source": "package.json",
+  "plan": [
+    "PLAN ONLY - not executed: backup app and config paths",
+    "PLAN ONLY - not executed: stop service after manual approval",
+    "PLAN ONLY - not executed: install validated artifact",
+    "PLAN ONLY - not executed: preserve config, state, spool, and secret files",
+    "PLAN ONLY - not executed: run file-only smoke",
+    "PLAN ONLY - not executed: use rollback plan if smoke fails"
+  ],
+  "rollback": [
+    "Restore prior artifact after manual approval.",
+    "Keep state and secrets untouched unless an operator explicitly changes them."
+  ]
+}
