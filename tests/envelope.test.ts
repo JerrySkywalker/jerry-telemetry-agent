@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEnvelope, stablePayloadHash } from "../src/telemetry/envelope.js";
+import { buildEnvelope, buildTelemetryBatch, buildTelemetryEnvelope, stablePayloadHash } from "../src/telemetry/envelope.js";
 import { testConfig } from "./helpers.js";
 
 describe("envelope", () => {
@@ -21,6 +21,20 @@ describe("envelope", () => {
 
   it("rejects payload event types outside the registry allowlist", () => {
     expect(() => buildEnvelope(testConfig(), { type: "custom.shell.output" })).toThrow(/Unsupported telemetry event type/);
+  });
+
+  it("builds generic v1 batches", () => {
+    const event = buildTelemetryEnvelope(
+      { node_id: "local-win-dev-01", hostname: "local-win-dev-01", region: "local", collector: "node-info" },
+      "node.snapshot",
+      { node_id: "local-win-dev-01" },
+      "2026-06-08T00:00:00.000Z"
+    );
+
+    expect(buildTelemetryBatch([event])).toEqual({
+      schema_version: "v1",
+      events: [event]
+    });
   });
 
   it("hashes object keys stably", () => {

@@ -7,6 +7,10 @@ Required only for HTTP upload:
 - `TELEMETRY_NODE_ID`
 - `TELEMETRY_NODE_SECRET`
 
+Optional for batch upload:
+- `TELEMETRY_HUB_BATCH_URL`; when unset and `TELEMETRY_HUB_URL` ends with `/v1/events`, the agent derives `/v1/events/batch`.
+- `TELEMETRY_NODE_KEY_ID`; when set, signed requests include `X-Telemetry-Key-Id`.
+
 Each node must use a unique `TELEMETRY_NODE_ID` and a unique `TELEMETRY_NODE_SECRET`. The secret is supplied outside git and is used only for HMAC upload signing.
 
 Runtime:
@@ -14,6 +18,7 @@ Runtime:
 - `CODEX_USAGE_POLL_INTERVAL_SECONDS=300`
 - `AGENT_INTERVAL_SECONDS=600` legacy fallback for poll interval
 - `TELEMETRY_COLLECTOR_MODE=codex-backend-usage|codex-cli-status-fallback`
+- Local batch collector names: `node-info`, `node-resources`, `service-health`, `custom-json`
 - `TELEMETRY_NODE_CONFIG_PATH=/config/node.json`
 - `TELEMETRY_ENABLE_TMUX_FALLBACK=false`
 - `TELEMETRY_OUTPUT_MODE=stdout,file,http`
@@ -29,6 +34,9 @@ Runtime:
 - `TELEMETRY_NODE_ID`
 - `TELEMETRY_NODE_ROLE`
 - `TELEMETRY_ACCOUNT_LABEL`
+- `TELEMETRY_CUSTOM_JSON_PATH` optional local custom-json fixture/file path, max 64 KiB.
+- `TELEMETRY_SERVICE_HEALTH_PATH` optional local service-health fixture/static file path.
+- `TELEMETRY_BATCH_OUTPUT_FILE=.smoke/telemetry-batch.safe.json`
 
 Health:
 - `HEALTH_SERVER_ENABLED=true`
@@ -66,6 +74,28 @@ npm run dev -- --once --collector codex-backend-usage
 
 HTTP upload is enabled only when `TELEMETRY_OUTPUT_MODE` includes `http` and all upload settings are present.
 
+## Local One-Shot Batch Examples
+
+Fixture file-only, no Hub and no secrets:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode Fixture -Output FileOnly -NodeId local-win-dev-01 -OutFile .smoke\fixture.batch.safe.json
+```
+
+Local Windows file-only, no Codex auth and no user-folder scan:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode LocalWindows -Output FileOnly -NodeId local-win-dev-01 -OutFile .smoke\local.batch.safe.json
+```
+
+Fixture push to an already-running local Hub:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode Fixture -Output Push -HubUrl http://127.0.0.1:3000 -NodeId sample-node -WriteSecret <dev-secret> -ReadToken <dev-read-token>
+```
+
+Push mode posts to `/v1/events/batch`. If `ReadToken` is supplied, the script checks `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom` without printing response bodies. Static read tokens are local/server-side test inputs and must not be embedded in browser, mobile, watch, or notification bundles.
+
 `codex-backend-usage` is the primary collector. `codex-cli-status-fallback` and tmux `/status` capture are migration fallbacks only and remain disabled by default.
 
 ## Declarative Node Config
@@ -85,7 +115,7 @@ HTTP upload is enabled only when `TELEMETRY_OUTPUT_MODE` includes `http` and all
 }
 ```
 
-Allowed collector names are `codex-backend-usage`, `codex-cli-status-fallback`, and `agent-health`. Unknown names fail closed at startup. Collector-specific configuration is typed by the registry; arbitrary shell command collectors are intentionally not supported.
+Allowed collector names are `codex-backend-usage`, `codex-cli-status-fallback`, `agent-health`, `node-info`, `node-resources`, `service-health`, and `custom-json`. Unknown names fail closed at startup. Collector-specific configuration is typed by the registry; arbitrary shell command collectors are intentionally not supported.
 
 For a non-LAX pilot that does not collect Codex usage, enable only `agent-health`:
 

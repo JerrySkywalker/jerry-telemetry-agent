@@ -1,6 +1,6 @@
 # jerry-telemetry-agent
 
-Dockerized node-side telemetry agent for Jerry telemetry hub.
+Generic node-side telemetry agent for Jerry telemetry hub. The first production profile is LAX Codex usage, but Codex usage is one collector profile rather than the whole product.
 
 Primary Codex collection now reads local Codex `auth.json`, uses the ChatGPT-managed access token to call `https://chatgpt.com/backend-api/wham/usage`, normalizes the response into `codex.usage.snapshot`, and emits it through stdout, file, or HTTP sinks. The tmux `/status` collector is fallback only.
 
@@ -42,6 +42,22 @@ For a local agent health smoke that does not read `auth.json` and does not uploa
 ```powershell
 scripts/smoke-agent-health-local.ps1
 ```
+
+For local generic server telemetry that does not require Codex auth:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode Fixture -Output FileOnly -NodeId local-win-dev-01 -OutFile .smoke\fixture.batch.safe.json
+.\scripts\agent-once.ps1 -Mode LocalWindows -Output FileOnly -NodeId local-win-dev-01 -OutFile .smoke\local.batch.safe.json
+.\scripts\smoke-local-agent.ps1
+```
+
+For a local Hub that is already running at `http://127.0.0.1:3000`, fixture push mode signs and posts a safe batch to `/v1/events/batch`, then reads back `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom` when a read token is supplied:
+
+```powershell
+.\scripts\agent-once.ps1 -Mode Fixture -Output Push -HubUrl http://127.0.0.1:3000 -NodeId sample-node -WriteSecret <dev-secret> -ReadToken <dev-read-token>
+```
+
+The local batch contains `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, `custom.snapshot`, and `telemetry.agent.health`. It writes only sanitized JSON and prints only safe status fields.
 
 For migration fallback file mode:
 
@@ -96,6 +112,8 @@ scripts/diag-lax-agent-safe.ps1
 Do not re-enable the old timer or delete old sender/collector files without a separate approved cleanup or rollback goal.
 
 Do not put real telemetry secrets in git. The agent never logs `TELEMETRY_NODE_SECRET`, access tokens, refresh tokens, raw `auth.json`, or raw backend usage responses.
+
+Local one-shot batch testing is a development workflow only. It does not deploy, change LAX services, modify the production Hub, add dashboard code, or create mobile/watch/notification consumers.
 
 ## Development Workflow
 

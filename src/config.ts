@@ -5,6 +5,7 @@ import {
   assertCollectorName,
   activeUsageCollectorFromConfig,
   defaultCollectorConfigs,
+  isUsageCollectorName,
   parseDeclarativeNodeConfig,
   type CollectorName,
   type DeclarativeNodeConfig,
@@ -30,8 +31,10 @@ export interface Config {
   hostCodexHome: string;
   codexTmuxSession: string;
   hubUrl: string;
+  hubBatchUrl: string;
   nodeId: string;
   nodeSecret: string;
+  nodeKeyId: string;
   hostname: string;
   region: string;
   collector: CollectorName;
@@ -138,15 +141,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     hostCodexHome: env.HOST_CODEX_HOME ?? "/host-codex-home",
     codexTmuxSession: env.CODEX_TMUX_SESSION ?? "codex-status-agent",
     hubUrl: env.TELEMETRY_HUB_URL ?? "",
+    hubBatchUrl: env.TELEMETRY_HUB_BATCH_URL ?? "",
     nodeId: env.TELEMETRY_NODE_ID ?? nodeConfig?.node_id ?? "",
     nodeSecret: env.TELEMETRY_NODE_SECRET ?? "",
+    nodeKeyId: env.TELEMETRY_NODE_KEY_ID ?? "",
     hostname: env.TELEMETRY_HOSTNAME ?? nodeConfig?.hostname ?? os.hostname(),
     region: env.TELEMETRY_REGION ?? nodeConfig?.region ?? "",
     collector: assertCollectorName(env.TELEMETRY_COLLECTOR ?? collectorMode),
     collectorMode,
-    collectorConfigs: nodeConfig?.collectors ?? (collectorMode === "agent-health"
-      ? [{ name: "agent-health", enabled: true, interval_seconds: intervalSeconds }]
-      : defaultCollectorConfigs(collectorMode, intervalSeconds, agentHealthEnabled)),
+    collectorConfigs: nodeConfig?.collectors ?? (isUsageCollectorName(collectorMode)
+      ? defaultCollectorConfigs(collectorMode, intervalSeconds, agentHealthEnabled)
+      : [{ name: collectorMode, enabled: true, interval_seconds: intervalSeconds }]),
     nodeConfigPath: env.TELEMETRY_NODE_CONFIG_PATH ?? "",
     accountLabel: env.TELEMETRY_ACCOUNT_LABEL ?? "",
     nodeRole: env.TELEMETRY_NODE_ROLE ?? nodeConfig?.role ?? "",

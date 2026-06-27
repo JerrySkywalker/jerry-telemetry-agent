@@ -33,6 +33,32 @@ describe("usage collector config", () => {
   it("fails closed for unknown collector names", () => {
     expect(() => loadConfig({ TELEMETRY_COLLECTOR_MODE: "shell" }, [])).toThrow(/Invalid collector name/);
     expect(() => loadConfig({}, ["--collector", "shell"])).toThrow(/Invalid collector name/);
+    expect(() => loadConfig({ TELEMETRY_COLLECTOR_MODE: "custom-shell-command" }, [])).toThrow(/Invalid collector name/);
+  });
+
+  it("allowlists generic local collector names without treating them as Codex usage collectors", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
+    const configPath = path.join(dir, "node.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        node_id: "local-win-dev-01",
+        hostname: "local-win-dev-01",
+        region: "local",
+        role: "dev-node",
+        collectors: [
+          { name: "node-info", enabled: true },
+          { name: "node-resources", enabled: true },
+          { name: "service-health", enabled: true },
+          { name: "custom-json", enabled: true }
+        ]
+      })
+    );
+
+    const config = loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath, TELEMETRY_OUTPUT_MODE: "file" }, ["--once"]);
+
+    expect(config.collectorMode).toBe("agent-health");
+    expect(config.collectorConfigs.map((item) => item.name)).toEqual(["node-info", "node-resources", "service-health", "custom-json"]);
   });
 
   it("keeps env-only LAX backend usage compatible", () => {

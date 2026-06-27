@@ -1,11 +1,18 @@
-export type CollectorName = "codex-backend-usage" | "codex-cli-status-fallback" | "agent-health";
-export type UsageCollectorName = Exclude<CollectorName, "agent-health">;
-export type CollectorEventType = "codex.usage.snapshot" | "telemetry.agent.health";
+export type UsageCollectorName = "codex-backend-usage" | "codex-cli-status-fallback";
+export type LocalCollectorName = "node-info" | "node-resources" | "service-health" | "custom-json";
+export type CollectorName = UsageCollectorName | "agent-health" | LocalCollectorName;
+export type CollectorEventType =
+  | "codex.usage.snapshot"
+  | "telemetry.agent.health"
+  | "node.snapshot"
+  | "node.resources.snapshot"
+  | "service.health.snapshot"
+  | "custom.snapshot";
 
 export interface CollectorDefinition<N extends CollectorName = CollectorName> {
   name: N;
   eventType: CollectorEventType;
-  payloadKind: "codex-usage" | "agent-health";
+  payloadKind: "codex-usage" | "agent-health" | "node-info" | "node-resources" | "service-health" | "custom-json";
   implemented: boolean;
 }
 
@@ -15,10 +22,7 @@ export interface BaseCollectorConfig<N extends CollectorName = CollectorName> {
   interval_seconds?: number;
 }
 
-export type NodeCollectorConfig =
-  | BaseCollectorConfig<"codex-backend-usage">
-  | BaseCollectorConfig<"codex-cli-status-fallback">
-  | BaseCollectorConfig<"agent-health">;
+export type NodeCollectorConfig = BaseCollectorConfig<CollectorName>;
 
 export interface DeclarativeNodeConfig {
   node_id?: string;
@@ -46,10 +50,36 @@ export const collectorRegistry = {
     eventType: "telemetry.agent.health",
     payloadKind: "agent-health",
     implemented: true
+  },
+  "node-info": {
+    name: "node-info",
+    eventType: "node.snapshot",
+    payloadKind: "node-info",
+    implemented: true
+  },
+  "node-resources": {
+    name: "node-resources",
+    eventType: "node.resources.snapshot",
+    payloadKind: "node-resources",
+    implemented: true
+  },
+  "service-health": {
+    name: "service-health",
+    eventType: "service.health.snapshot",
+    payloadKind: "service-health",
+    implemented: true
+  },
+  "custom-json": {
+    name: "custom-json",
+    eventType: "custom.snapshot",
+    payloadKind: "custom-json",
+    implemented: true
   }
 } satisfies Record<CollectorName, CollectorDefinition>;
 
 const collectorNames = new Set<CollectorName>(Object.keys(collectorRegistry) as CollectorName[]);
+const usageCollectorNames = new Set<UsageCollectorName>(["codex-backend-usage", "codex-cli-status-fallback"]);
+const collectorEventTypes = new Set<CollectorEventType>(Object.values(collectorRegistry).map((item) => item.eventType));
 
 export function assertCollectorName(value: string | undefined): CollectorName {
   if (value && collectorNames.has(value as CollectorName)) return value as CollectorName;
@@ -58,16 +88,20 @@ export function assertCollectorName(value: string | undefined): CollectorName {
 
 export function assertUsageCollectorName(value: string | undefined): UsageCollectorName {
   const name = assertCollectorName(value);
-  if (name === "agent-health") throw new Error("agent-health is not a usage collector");
+  if (!isUsageCollectorName(name)) throw new Error(`${name} is not a usage collector`);
   return name;
 }
 
 export function isUsageCollectorName(name: CollectorName): name is UsageCollectorName {
-  return name !== "agent-health";
+  return usageCollectorNames.has(name as UsageCollectorName);
 }
 
 export function collectorEventType(name: CollectorName): CollectorEventType {
   return collectorRegistry[name].eventType;
+}
+
+export function isCollectorEventType(value: string): value is CollectorEventType {
+  return collectorEventTypes.has(value as CollectorEventType);
 }
 
 export function parseDeclarativeNodeConfig(value: unknown): DeclarativeNodeConfig {

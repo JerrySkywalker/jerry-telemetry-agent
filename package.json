@@ -12,6 +12,8 @@
     "smoke:codex-backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-codex-backend-usage-local.ps1",
     "smoke:agent-health": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-agent-health-local.ps1",
     "smoke:non-lax-pilot": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-non-lax-pilot-local.ps1",
+    "smoke:local-agent": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-local-agent.ps1",
+    "agent:once": "tsx src/agent-once.ts",
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts"
   },
