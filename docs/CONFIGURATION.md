@@ -100,6 +100,36 @@ Fixture push to an already-running local Hub:
 
 Push mode posts to `/v1/events/batch`. If `ReadToken` is supplied, the script checks `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom` without printing response bodies. Static read tokens are local/server-side test inputs and must not be embedded in browser, mobile, watch, or notification bundles.
 
+## Local Sibling Hub E2E
+
+The auto-started E2E harness does not require manual dev secrets:
+
+```powershell
+.\scripts\smoke-local-hub-agent-e2e.ps1 -Mode Once
+.\scripts\smoke-local-hub-agent-e2e.ps1 -Mode Daemon
+```
+
+Defaults:
+
+- Agent repo: `V:\src\jerry-telemetry-agent`
+- Hub repo: `V:\src\jerry-telemetry-hub`
+- Hub host: `127.0.0.1`
+- preferred Hub port: `3300`, with a free localhost port selected if needed
+- SQLite path: `.smoke\local-hub-agent-e2e\<run>\telemetry.sqlite3`
+
+The harness sets Hub child-process env only:
+
+- `HOST=127.0.0.1`
+- `PORT=<local-port>`
+- `SQLITE_PATH=<temp-sqlite-path>`
+- `TELEMETRY_NODE_SECRETS=<generated-node-id>:<generated-write-secret>`
+- `TELEMETRY_READ_AUTH_ENABLED=true`
+- `TELEMETRY_READ_AUTH_ALLOW_LOCALHOST=false`
+- `TELEMETRY_READ_TOKEN_NAME=local-e2e`
+- `TELEMETRY_READ_TOKEN_SHA256=<generated-read-token-sha256>`
+
+The generated write secret, read token, and read token hash are not printed and are not written to reusable config files.
+
 ## Server One-Shot Batch Examples
 
 Local file-only server batch:

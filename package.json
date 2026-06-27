@@ -16,6 +16,9 @@
     "agent:once": "tsx src/agent-once.ts",
     "server:once": "tsx src/server-agent-once.ts",
     "server:daemon": "tsx src/server-agent-daemon.ts",
+    "smoke:local-hub-agent-e2e": "tsx src/local-hub-agent-e2e.ts",
+    "smoke:local-hub-agent-e2e:once": "tsx src/local-hub-agent-e2e.ts --mode Once",
+    "smoke:local-hub-agent-e2e:daemon": "tsx src/local-hub-agent-e2e.ts --mode Daemon",
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts"
   },
