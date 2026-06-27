@@ -34,6 +34,25 @@ Fixture push to an already-running local Hub:
 
 Push mode posts a safe batch to `/v1/events/batch`. With a read token it verifies readback from `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom`, and prints only concise status fields. If Hub is not running or dev credentials are absent, `scripts/smoke-local-agent-e2e.ps1` reports a safe failure or skip.
 
+## Linux Server Batch Validation
+
+The server one-shot workflow prepares future Linux server telemetry without deployment:
+
+```powershell
+.\scripts\server-agent-once.ps1 -Config .\deploy\examples\general-linux-agent.node.json -Output FileOnly -OutFile .smoke\server.batch.safe.json
+.\scripts\smoke-server-agent.ps1
+```
+
+The batch includes Linux node info, resources, HTTP/TCP probe status, Docker container status, systemd unit status, custom JSON, and agent health when those collectors are enabled. Docker and systemd are read-only status collectors and degrade safely when unavailable.
+
+Read-only target preflight template:
+
+```powershell
+.\scripts\preflight-linux-agent.ps1
+```
+
+The preflight script prints Linux command templates for Docker, Compose, disk, memory, Hub health, state directory, and conflict checks. It does not SSH, create services, edit timers, run Compose, upload telemetry, or print secrets.
+
 ## Non-LAX Pilot Package
 
 The first non-LAX pilot package is local-only and health-only:

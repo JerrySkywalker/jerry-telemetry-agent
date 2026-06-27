@@ -18,7 +18,7 @@ Runtime:
 - `CODEX_USAGE_POLL_INTERVAL_SECONDS=300`
 - `AGENT_INTERVAL_SECONDS=600` legacy fallback for poll interval
 - `TELEMETRY_COLLECTOR_MODE=codex-backend-usage|codex-cli-status-fallback`
-- Local batch collector names: `node-info`, `node-resources`, `service-health`, `custom-json`
+- Generic server collector names: `node-info`, `node-resources`, `service-health`, `http-probe`, `tcp-probe`, `docker-containers`, `systemd-units`, `custom-json`
 - `TELEMETRY_NODE_CONFIG_PATH=/config/node.json`
 - `TELEMETRY_ENABLE_TMUX_FALLBACK=false`
 - `TELEMETRY_OUTPUT_MODE=stdout,file,http`
@@ -96,6 +96,28 @@ Fixture push to an already-running local Hub:
 
 Push mode posts to `/v1/events/batch`. If `ReadToken` is supplied, the script checks `/v1/nodes`, `/v1/summary`, `/v1/services`, and `/v1/custom` without printing response bodies. Static read tokens are local/server-side test inputs and must not be embedded in browser, mobile, watch, or notification bundles.
 
+## Server One-Shot Batch Examples
+
+Local file-only server batch:
+
+```powershell
+.\scripts\server-agent-once.ps1 -Config .\deploy\examples\general-linux-agent.node.json -Output FileOnly -OutFile .smoke\server.batch.safe.json
+```
+
+Local smoke:
+
+```powershell
+.\scripts\smoke-server-agent.ps1
+```
+
+Read-only Linux preflight template:
+
+```powershell
+.\scripts\preflight-linux-agent.ps1
+```
+
+The server one-shot path uses `npm run server:once` under the wrapper script. It writes a v1 batch for Hub `/v1/events/batch`, but file output is the default validation mode.
+
 `codex-backend-usage` is the primary collector. `codex-cli-status-fallback` and tmux `/status` capture are migration fallbacks only and remain disabled by default.
 
 ## Declarative Node Config
@@ -115,7 +137,49 @@ Push mode posts to `/v1/events/batch`. If `ReadToken` is supplied, the script ch
 }
 ```
 
-Allowed collector names are `codex-backend-usage`, `codex-cli-status-fallback`, `agent-health`, `node-info`, `node-resources`, `service-health`, and `custom-json`. Unknown names fail closed at startup. Collector-specific configuration is typed by the registry; arbitrary shell command collectors are intentionally not supported.
+Allowed collector names are `codex-backend-usage`, `codex-cli-status-fallback`, `agent-health`, `node-info`, `node-resources`, `service-health`, `http-probe`, `tcp-probe`, `docker-containers`, `systemd-units`, and `custom-json`. Unknown names fail closed at startup. Collector-specific configuration is typed by the registry; arbitrary shell command collectors are intentionally not supported.
+
+Linux server config example:
+
+```json
+{
+  "node_id": "example-linux-01",
+  "hostname": "example-linux-01",
+  "region": "local",
+  "role": "general-linux-node",
+  "provider": "local",
+  "collectors": [
+    { "name": "node-info", "enabled": true, "interval_seconds": 60 },
+    { "name": "node-resources", "enabled": true, "interval_seconds": 60 },
+    {
+      "name": "http-probe",
+      "enabled": true,
+      "targets": [
+        { "name": "local-hub-health", "url": "http://127.0.0.1:3000/healthz", "timeout_ms": 2000 }
+      ]
+    },
+    {
+      "name": "tcp-probe",
+      "enabled": true,
+      "targets": [
+        { "name": "ssh-local", "host": "127.0.0.1", "port": 22, "timeout_ms": 1000 }
+      ]
+    },
+    { "name": "docker-containers", "enabled": false, "allowlist": ["jerry-*", "nginx", "openresty"] },
+    { "name": "systemd-units", "enabled": false, "units": ["docker.service", "nginx.service"] },
+    {
+      "name": "custom-json",
+      "enabled": false,
+      "files": [
+        { "name": "example", "path": "/var/lib/jerry-telemetry-agent/custom/example.json" }
+      ]
+    },
+    { "name": "agent-health", "enabled": true, "interval_seconds": 60 }
+  ]
+}
+```
+
+HTTP probes allow only `GET` and `HEAD`, enforce `timeout_ms`, and omit response bodies and headers. TCP probes check one configured host and port only. `systemd-units` requires an explicit `units` allowlist when enabled. `custom-json.files[].path` must be a local path, not a remote URL.
 
 For a non-LAX pilot that does not collect Codex usage, enable only `agent-health`:
 

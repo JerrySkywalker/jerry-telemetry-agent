@@ -7,6 +7,10 @@ Collectors are selected through a typed allowlist. Implemented names are:
 - `node-info`
 - `node-resources`
 - `service-health`
+- `http-probe`
+- `tcp-probe`
+- `docker-containers`
+- `systemd-units`
 - `custom-json`
 
 Unknown collector names fail closed during config loading. Arbitrary shell command collectors are intentionally not supported. Additional collectors must be added to the registry with an explicit event type and safe payload contract before they can run.
@@ -54,15 +58,31 @@ Generic server snapshot collector. Emits `node.snapshot` with only node id, host
 
 ## node-resources
 
-Generic resource snapshot collector. Emits `node.resources.snapshot` with memory totals/free/percent, load averages where available, uptime, nullable CPU/process metrics when not safely available, and disk summaries limited to generic drive or mount labels plus total/free/used percentages.
+Generic resource snapshot collector. Emits `node.resources.snapshot` with memory totals/free/percent, load averages where available, uptime, nullable CPU/process metrics when not safely available, disk summaries limited to generic drive or mount labels plus total/free/used percentages and safe filesystem type, and a network status summary without IP or MAC addresses.
 
 ## service-health
 
 Fixture/static service-health collector. Emits `service.health.snapshot` with an allowlisted `services` array: name, kind, status, last check, message, response time, and non-sensitive port. It must not emit URLs with credentials, request headers, response bodies, logs, or environment data.
 
+## http-probe
+
+Safe HTTP probe collector. Emits `service.health.snapshot` with name, kind, health status, last check time, response time, status code, sanitized URL, and message. Only `GET` and `HEAD` are allowed. It enforces timeouts, uses bounded redirect behavior, and never emits request headers or response bodies.
+
+## tcp-probe
+
+Safe TCP probe collector. Emits `service.health.snapshot` with name, kind, health status, last check time, response time, port, and message. It checks only explicitly configured single host/port targets and validates ports from 1 to 65535.
+
+## docker-containers
+
+Read-only Docker status collector. Emits `docker.containers.snapshot` from safe `docker ps` formatting. It reports name, sanitized image, status, state, health, optional restart count, optional started timestamp, and host/container port numbers only. It does not inspect containers, print env, print mounts, print labels by default, or require privileged mode.
+
+## systemd-units
+
+Read-only systemd status collector. Emits `systemd.units.snapshot` for configured unit names only. It uses `systemctl show` for safe fields: name, active state, sub state, load state, active-since timestamp, short description, and derived status. It does not call `journalctl`, emit `ExecStart`, print env, or start/stop/restart/enable/disable units.
+
 ## custom-json
 
-Fixture/file custom collector. Emits `custom.snapshot` from a local path supplied by config, CLI, or environment. Files are limited to 64 KiB. Arbitrary JSON is summarized by type/count/size unless the file is explicitly marked safe with a top-level `safe: true` and `data` object; safe data is still recursively sanitized.
+Fixture/file custom collector. Emits `custom.snapshot` from local paths supplied by config, CLI, or environment. Files are limited to 64 KiB. Output is controlled to name, status, message, observed timestamp, tags, and sanitized `safe_values` only when the file is explicitly marked safe. Raw env, logs, headers, authorization, cookies, tokens, account/user/email fields, secrets, passwords, and `auth.json` markers are omitted.
 
 ## LAX backend usage Docker mode
 

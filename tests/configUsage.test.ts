@@ -61,6 +61,64 @@ describe("usage collector config", () => {
     expect(config.collectorConfigs.map((item) => item.name)).toEqual(["node-info", "node-resources", "service-health", "custom-json"]);
   });
 
+  it("loads declarative Linux server collector config", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
+    const configPath = path.join(dir, "linux-node.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        node_id: "example-linux-01",
+        hostname: "example-linux-01",
+        region: "local",
+        role: "general-linux-node",
+        provider: "local",
+        collectors: [
+          { name: "node-info", enabled: true, interval_seconds: 60 },
+          { name: "node-resources", enabled: true, interval_seconds: 60 },
+          { name: "http-probe", enabled: true, targets: [{ name: "health", url: "http://127.0.0.1:3000/healthz", timeout_ms: 1000 }] },
+          { name: "tcp-probe", enabled: true, targets: [{ name: "ssh", host: "127.0.0.1", port: 22, timeout_ms: 1000 }] },
+          { name: "docker-containers", enabled: false, allowlist: ["jerry-*"] },
+          { name: "systemd-units", enabled: false, units: ["docker.service"] },
+          { name: "custom-json", enabled: false, files: [{ name: "example", path: "/var/lib/jerry-telemetry-agent/custom/example.json" }] },
+          { name: "agent-health", enabled: true, interval_seconds: 60 }
+        ]
+      })
+    );
+
+    const config = loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath, TELEMETRY_OUTPUT_MODE: "file" }, ["--once"]);
+
+    expect(config.nodeId).toBe("example-linux-01");
+    expect(config.collectorConfigs.map((item) => item.name)).toEqual([
+      "node-info",
+      "node-resources",
+      "http-probe",
+      "tcp-probe",
+      "docker-containers",
+      "systemd-units",
+      "custom-json",
+      "agent-health"
+    ]);
+    expect(config.collectorConfigs.find((item) => item.name === "http-probe")?.targets?.[0]).toMatchObject({ method: "GET" });
+  });
+
+  it("rejects unsafe probe and systemd config", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
+    const configPath = path.join(dir, "bad-node.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        node_id: "bad",
+        collectors: [
+          { name: "tcp-probe", enabled: true, targets: [{ name: "bad", host: "127.0.0.1", port: 70000 }] }
+        ]
+      })
+    );
+    expect(() => loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath }, ["--once"])).toThrow(/port/);
+
+    await writeFile(configPath, JSON.stringify({ node_id: "bad", collectors: [{ name: "systemd-units", enabled: true, units: [] }] }));
+    expect(() => loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath }, ["--once"])).toThrow(/systemd-units/);
+  });
+
   it("keeps env-only LAX backend usage compatible", () => {
     const config = loadConfig(
       {
