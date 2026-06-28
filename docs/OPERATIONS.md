@@ -146,6 +146,27 @@ See:
 - [ops/telemetry-stack-operator-handoff.md](ops/telemetry-stack-operator-handoff.md)
 - [ops/telemetry-stack-production-authorization.md](ops/telemetry-stack-production-authorization.md)
 
+## Retained Canary Baseline Hardening
+
+Canary hardening is repository-owned planning unless a later goal explicitly authorizes live work:
+
+```powershell
+.\scripts\canary-baseline-audit.ps1
+.\scripts\canary-service-baseline-plan-local.ps1
+.\scripts\canary-agent-supervision-plan-local.ps1
+.\scripts\canary-live-audit-contract-local.ps1
+.\scripts\canary-rollback-plan-local.ps1
+```
+
+The retained canary remains a canary baseline, not a production rename. The Agent canary restart policy concern is tracked as an operational issue, but these scripts do not change Docker runtime, service units, tunnels, credentials, config files, or spool. Existing LAX Codex runtime remains untouched, archived spool is preserved, stale prior HTTP error timestamps are treated as historical when current error flags are clear and successful sends are newer, and raw Hub public exposure remains forbidden.
+
+See:
+
+- [ops/canary-service-baseline-hardening.md](ops/canary-service-baseline-hardening.md)
+- [ops/canary-agent-supervision-options.md](ops/canary-agent-supervision-options.md)
+- [ops/canary-live-audit-contract.md](ops/canary-live-audit-contract.md)
+- [ops/canary-stabilization-to-production-boundary.md](ops/canary-stabilization-to-production-boundary.md)
+
 ## Non-LAX Pilot Package
 
 The first non-LAX pilot package is local-only and health-only:
