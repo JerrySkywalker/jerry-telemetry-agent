@@ -75,6 +75,7 @@ try {
     Run-Step "canary-service-baseline-plan-local.ps1" { & "$PSScriptRoot\canary-service-baseline-plan-local.ps1" -EvidenceRoot ".smoke" -OutputDir ".smoke\release-gate\canary-service-baseline-plan" }
     Run-Step "canary-agent-supervision-plan-local.ps1" { & "$PSScriptRoot\canary-agent-supervision-plan-local.ps1" -OutputDir ".smoke\release-gate\canary-agent-supervision-plan" }
     Run-Step "canary-live-audit-contract-local.ps1" { & "$PSScriptRoot\canary-live-audit-contract-local.ps1" -OutputDir ".smoke\release-gate\canary-live-audit-contract" }
+    Run-Step "canary-report-summarize-local.ps1" { & "$PSScriptRoot\canary-report-summarize-local.ps1" -EvidenceRoot ".smoke" -OutputDir ".smoke\release-gate\canary-report-summary" }
   } else {
     Write-Host "SKIP canary-baseline-hardening reason=local_canary_evidence_missing"
   }

@@ -30,6 +30,7 @@
 - Deployment-readiness scripts render only local plans/artifacts, report secret presence as booleans, and never render real env files with secret values.
 - Canary baseline hardening scripts are local plan/report generators. They do not SSH, mutate live services, mutate Docker runtime, change tunnels, rotate credentials, or touch spool.
 - Canary live-audit contracts require count-only reporting, marker scans, and redaction of secret values, private key material, signatures, cookies, raw request bodies, raw response bodies, and raw logs.
+- Canary live-audit and soak scripts may use explicitly authorized SSH for read-only checks only. They summarize status fields and counts, use Hub readback credentials only server-side, and must not mutate services, Docker runtime, tunnels, configs, credentials, or spool.
 - Retained canary docs explicitly forbid raw Hub public exposure and keep readback credentials server-side only.
 - Package validation excludes `.env`, `.env.*`, `auth.json`, state, logs, `.smoke`, `node_modules`, raw snapshots, generated credentials, and backups from local artifacts.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.

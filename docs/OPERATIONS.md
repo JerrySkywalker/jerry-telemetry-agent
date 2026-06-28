@@ -109,6 +109,31 @@ The script does not print the write secret, HMAC signature, raw request body, he
 
 Deployment templates live under `deploy/examples/` and are placeholders only. Do not install, enable, start, stop, restart, or edit production services from this goal.
 
+## Retained Canary Live Audit
+
+Live canary audit is read-only and requires explicit operator authorization for the specific goal.
+
+```powershell
+.\scripts\canary-live-audit-readonly.ps1 -HubTarget beijing -AgentTarget lax -Samples 1
+.\scripts\canary-soak-readonly.ps1 -HubTarget beijing -AgentTarget lax -Samples 2 -IntervalSeconds 30
+.\scripts\canary-report-summarize-local.ps1
+```
+
+These scripts produce local reports under `.smoke`. They summarize Hub canary health, reverse tunnel health, Agent HTTP canary health, read-model status, SQLite integrity, active spool count, archived spool count, and bounded log counts.
+
+Operational boundaries:
+
+- Read-only SSH inspection only after explicit authorization.
+- No deployment, upload, production path write, service mutation, Docker runtime mutation, tunnel mutation, config mutation, credential mutation, or spool mutation.
+- No raw logs, raw response bodies, environment files, private keys, read tokens, node secrets, signed headers, cookies, account identifiers, user identifiers, mail addresses, or webhook URLs in reports.
+- Archived old spool and failed-check spool remain diagnostic evidence and must not be flushed, restored, or deleted automatically.
+- A stale prior HTTP error timestamp is interpreted only with the current error-present flag and latest successful send timestamp.
+- Existing LAX Codex runtime remains untouched.
+- Raw Hub public exposure remains forbidden.
+- The retained canary is not a production rename.
+
+Use `scripts/canary-rollback-plan-local.ps1` to render rollback options when live audit or soak checks fail. Do not execute rollback without a separate explicit authorization.
+
 ## Deployment Readiness Gate
 
 Before any future manually approved deployment, run:

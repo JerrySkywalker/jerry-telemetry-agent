@@ -23,6 +23,16 @@ scripts/validate-local.ps1
 scripts/scan-secrets-light.ps1
 ```
 
+Retained canary evidence and read-only live audit tools:
+
+```powershell
+.\scripts\canary-report-summarize-local.ps1
+.\scripts\canary-live-audit-readonly.ps1 -HubTarget beijing -AgentTarget lax -Samples 1
+.\scripts\canary-soak-readonly.ps1 -HubTarget beijing -AgentTarget lax -Samples 2 -IntervalSeconds 30
+```
+
+Live canary audit and soak commands require explicit operator authorization. They use SSH for read-only status checks only, write reports under `.smoke`, and must not mutate services, Docker runtime, tunnels, configs, credentials, or spool.
+
 For local backend usage stdout mode:
 
 ```powershell

@@ -60,6 +60,7 @@ try {
   Run-Step "canary-service-baseline-plan-local.ps1" { & "$PSScriptRoot\canary-service-baseline-plan-local.ps1" -EvidenceRoot ".smoke" -OutputDir (Join-Path $runRoot "service-baseline-plan") }
   Run-Step "canary-agent-supervision-plan-local.ps1" { & "$PSScriptRoot\canary-agent-supervision-plan-local.ps1" -OutputDir (Join-Path $runRoot "agent-supervision-plan") }
   Run-Step "canary-live-audit-contract-local.ps1" { & "$PSScriptRoot\canary-live-audit-contract-local.ps1" -OutputDir (Join-Path $runRoot "live-audit-contract") }
+  Run-Step "canary-report-summarize-local.ps1" { & "$PSScriptRoot\canary-report-summarize-local.ps1" -EvidenceRoot ".smoke" -OutputDir (Join-Path $runRoot "report-summary") }
 
   $agentBranch = (git branch --show-current).Trim()
   if ($SkipStackRc) {
