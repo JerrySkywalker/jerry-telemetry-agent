@@ -66,6 +66,16 @@ try {
   Run-Step "upgrade-agent-dry-run.ps1" { & "$PSScriptRoot\upgrade-agent-dry-run.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -OutputDir ".smoke\release-gate\upgrade-plan" }
   Run-Step "uninstall-agent-dry-run.ps1" { & "$PSScriptRoot\uninstall-agent-dry-run.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -OutputDir ".smoke\release-gate\uninstall-plan" }
 
+  $canaryEvidenceAvailable =
+    (Get-ChildItem -Path ".smoke" -Directory -Filter "canary-stabilize-*" -ErrorAction SilentlyContinue | Select-Object -First 1) -and
+    (Get-ChildItem -Path ".smoke" -Directory -Filter "http-canary-observe-03-*" -ErrorAction SilentlyContinue | Select-Object -First 1) -and
+    (Get-ChildItem -Path ".smoke" -Directory -Filter "canary-promote-plan-*" -ErrorAction SilentlyContinue | Select-Object -First 1)
+  if ($canaryEvidenceAvailable) {
+    Run-Step "canary-baseline-audit.ps1 evidence" { & "$PSScriptRoot\canary-baseline-audit.ps1" -EvidenceRoot ".smoke" -OutputDir ".smoke\release-gate\canary-baseline-audit" }
+  } else {
+    Write-Host "SKIP canary-baseline-audit reason=local_canary_evidence_missing"
+  }
+
   Write-Host "release_gate_local=PASS"
   Write-Host "production_mutation=false"
   Write-Host "output_safety=checked"
