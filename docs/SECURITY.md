@@ -28,6 +28,9 @@
 - The local sibling Hub+Agent E2E harness generates write/read credentials in memory, passes them only through child-process environment variables, never prints them, never writes them to reusable config files, and scans logs/output for generated credential values.
 - The local sibling Hub+Agent E2E harness starts Hub from a safe working directory and sets `DOTENV_CONFIG_PATH` to a non-existent run-local path so the Hub repository `.env` is not used.
 - Deployment-readiness scripts render only local plans/artifacts, report secret presence as booleans, and never render real env files with secret values.
+- Canary baseline hardening scripts are local plan/report generators. They do not SSH, mutate live services, mutate Docker runtime, change tunnels, rotate credentials, or touch spool.
+- Canary live-audit contracts require count-only reporting, marker scans, and redaction of secret values, private key material, signatures, cookies, raw request bodies, raw response bodies, and raw logs.
+- Retained canary docs explicitly forbid raw Hub public exposure and keep readback credentials server-side only.
 - Package validation excludes `.env`, `.env.*`, `auth.json`, state, logs, `.smoke`, `node_modules`, raw snapshots, generated credentials, and backups from local artifacts.
 - No OAuth refresh is implemented; Codex CLI owns authentication refresh.
 

@@ -109,6 +109,17 @@ For a local release-candidate check of Agent plus the sibling Hub repository:
 
 The stack RC gate runs only local checks, writes reports under `.smoke\stack-rc`, and does not deploy or mutate production services. See [docs/ops/telemetry-stack-release-candidate.md](docs/ops/telemetry-stack-release-candidate.md).
 
+For retained canary baseline audit and service-hardening plans:
+
+```powershell
+npm run canary:audit
+npm run canary:service-plan
+npm run canary:supervision-plan
+npm run canary:rollback-plan
+```
+
+These commands are local plan/report generators. They do not SSH, deploy, mutate services, change Docker runtime, modify tunnels, rotate credentials, or touch spool. See [docs/ops/canary-service-baseline-hardening.md](docs/ops/canary-service-baseline-hardening.md), [docs/ops/canary-agent-supervision-options.md](docs/ops/canary-agent-supervision-options.md), and [docs/ops/canary-stabilization-to-production-boundary.md](docs/ops/canary-stabilization-to-production-boundary.md).
+
 For migration fallback file mode:
 
 ```powershell

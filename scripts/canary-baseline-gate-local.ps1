@@ -57,6 +57,9 @@ try {
   Run-Step "validate-local.ps1" { & "$PSScriptRoot\validate-local.ps1" }
   Run-Step "release-gate-local.ps1" { & "$PSScriptRoot\release-gate-local.ps1" -HubRepoPath $HubRepoPath }
   Run-Step "canary-baseline-audit.ps1" { & "$PSScriptRoot\canary-baseline-audit.ps1" -EvidenceRoot ".smoke" -OutputDir (Join-Path $runRoot "audit") }
+  Run-Step "canary-service-baseline-plan-local.ps1" { & "$PSScriptRoot\canary-service-baseline-plan-local.ps1" -EvidenceRoot ".smoke" -OutputDir (Join-Path $runRoot "service-baseline-plan") }
+  Run-Step "canary-agent-supervision-plan-local.ps1" { & "$PSScriptRoot\canary-agent-supervision-plan-local.ps1" -OutputDir (Join-Path $runRoot "agent-supervision-plan") }
+  Run-Step "canary-live-audit-contract-local.ps1" { & "$PSScriptRoot\canary-live-audit-contract-local.ps1" -OutputDir (Join-Path $runRoot "live-audit-contract") }
 
   $agentBranch = (git branch --show-current).Trim()
   if ($SkipStackRc) {
