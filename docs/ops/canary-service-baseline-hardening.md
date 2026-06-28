@@ -21,6 +21,16 @@ Repository-owned planning command:
 .\scripts\canary-service-baseline-plan-local.ps1
 ```
 
+Repository-owned read-only observation commands:
+
+```powershell
+.\scripts\canary-live-audit-readonly.ps1 -HubTarget beijing -AgentTarget lax -Samples 1
+.\scripts\canary-soak-readonly.ps1 -HubTarget beijing -AgentTarget lax -Samples 2 -IntervalSeconds 30
+.\scripts\canary-report-summarize-local.ps1
+```
+
+The live commands require explicit operator authorization and produce local `.smoke` reports. They are not deployment commands and must not mutate live services, Docker runtime, tunnels, configs, credentials, or spool.
+
 The plan covers:
 
 - Hub canary service baseline.
