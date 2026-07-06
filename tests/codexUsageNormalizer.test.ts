@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { inspectBackendUsageCompleteness } from "../src/collectors/codex/backend-completeness-inspection.js";
 import { errorSnapshot, normalizeCodexUsage, summarizeCodexUsage } from "../src/collectors/codex/normalizer.js";
 import { inspectCodexUsageShape } from "../src/collectors/codex/shape-inspection.js";
 import { testConfig } from "./helpers.js";
@@ -92,6 +93,153 @@ describe("Codex usage normalizer", () => {
       window_seconds: 86400,
       reset_source: "backend_absolute",
       completeness: "full"
+    });
+  });
+
+  it("expands backend nested windows into four status-equivalent safe rows", () => {
+    const rawFourWindowBackend = {
+      rate_limit: {
+        primary_window: {
+          used_percent: 25,
+          reset_after_seconds: 3600,
+          limit_window_seconds: 18000
+        },
+        secondary_window: {
+          percent_remaining: 40,
+          reset_at: "2026-06-15T00:00:00.000Z",
+          limit_window_seconds: 604800
+        }
+      },
+      additional_rate_limits: [
+        {
+          limit_name: "GPT-5.3-Codex-Spark",
+          metered_feature: "cloud_tasks",
+          rate_limit: {
+            primary_window: {
+              usage_percent: 70,
+              reset_after_seconds: 7200,
+              limit_window_seconds: 18000
+            },
+            secondary_window: {
+              remaining_percent: 55,
+              reset_at: "2026-06-16T00:00:00.000Z",
+              limit_window_seconds: 604800
+            }
+          }
+        }
+      ],
+      access_token: "hidden",
+      account_id: "acct_123",
+      email: "do-not-emit@example.com"
+    };
+
+    const snapshot = normalizeCodexUsage(rawFourWindowBackend, testConfig(), "2026-06-08T00:00:00.000Z");
+    expect(snapshot.limits_count).toBe(4);
+    expect(snapshot.limits_detail).toMatchObject([
+      {
+        key: "default:5h",
+        group_label: "default",
+        window_label: "5h",
+        data_source: "backend",
+        used_percent: 25,
+        remaining_percent: 75,
+        reset_at_iso: "2026-06-08T01:00:00.000Z",
+        reset_in_seconds: 3600,
+        window_seconds: 18000,
+        completeness: "full"
+      },
+      {
+        key: "default:weekly",
+        group_label: "default",
+        window_label: "weekly",
+        used_percent: 60,
+        remaining_percent: 40,
+        reset_at_iso: "2026-06-15T00:00:00.000Z",
+        window_seconds: 604800,
+        completeness: "full"
+      },
+      {
+        key: "additional:GPT-5.3-Codex-Spark:5h",
+        group_label: "GPT-5.3-Codex-Spark",
+        window_label: "5h",
+        metered_feature: "cloud_tasks",
+        used_percent: 70,
+        remaining_percent: 30,
+        reset_at_iso: "2026-06-08T02:00:00.000Z",
+        reset_in_seconds: 7200,
+        window_seconds: 18000,
+        completeness: "full"
+      },
+      {
+        key: "additional:GPT-5.3-Codex-Spark:weekly",
+        group_label: "GPT-5.3-Codex-Spark",
+        window_label: "weekly",
+        used_percent: 45,
+        remaining_percent: 55,
+        reset_at_iso: "2026-06-16T00:00:00.000Z",
+        window_seconds: 604800,
+        completeness: "full"
+      }
+    ]);
+    expect(JSON.stringify(snapshot)).not.toContain("hidden");
+    expect(JSON.stringify(snapshot)).not.toContain("acct_123");
+    expect(JSON.stringify(snapshot)).not.toContain("do-not-emit");
+
+    const inspection = inspectBackendUsageCompleteness(rawFourWindowBackend, snapshot);
+    expect(inspection).toMatchObject({
+      backend_response_ok: true,
+      candidate_limit_row_count: 4,
+      default_5h_found: true,
+      default_weekly_found: true,
+      spark_5h_found: true,
+      spark_weekly_found: true,
+      normalizer_gap_detected: false,
+      source_gap_detected: false
+    });
+    expect(inspection.remaining_percent_present_by_row).toEqual({
+      default_5h: true,
+      default_weekly: true,
+      spark_5h: true,
+      spark_weekly: true
+    });
+  });
+
+  it("classifies two-row backend shapes as source gap for four-window status equivalence", () => {
+    const rawTwoRowsOnly = {
+      rate_limit: { used_percent: 20, reset_after_seconds: 3600 },
+      additional_rate_limits: [{ limit_name: "GPT-5.3-Codex-Spark", used_percent: 10, reset_after_seconds: 3600 }]
+    };
+
+    const snapshot = normalizeCodexUsage(rawTwoRowsOnly, testConfig(), "2026-06-08T00:00:00.000Z");
+    const inspection = inspectBackendUsageCompleteness(rawTwoRowsOnly, snapshot);
+
+    expect(snapshot.limits_count).toBe(2);
+    expect(inspection.source_gap_detected).toBe(true);
+    expect(inspection.default_5h_found).toBe(false);
+    expect(inspection.spark_weekly_found).toBe(false);
+  });
+
+  it("preserves not_reported reset fields for backend windows with percent but no reset", () => {
+    const snapshot = normalizeCodexUsage(
+      {
+        rate_limit: {
+          primary_window: { percent_remaining: 80, limit_window_seconds: 18000 }
+        }
+      },
+      testConfig(),
+      "2026-06-08T00:00:00.000Z"
+    );
+
+    expect(snapshot.limits_detail[0]).toMatchObject({
+      key: "default:5h",
+      window_label: "5h",
+      used_percent: 20,
+      remaining_percent: 80,
+      reset_at_iso: null,
+      reset_in_seconds: null,
+      window_seconds: 18000,
+      reset_source: "not_reported",
+      completeness: "partial"
     });
   });
 

@@ -1,6 +1,7 @@
 export type CodexUsageSource = "chatgpt_backend_wham_usage" | "codex_cli_status_capture";
 
 export interface CodexRateWindow {
+  window_label?: string;
   window_seconds?: number;
   reset_at_epoch?: number;
   reset_at_iso?: string;
@@ -12,6 +13,9 @@ export interface CodexRateLimit {
   scope: "default" | "additional";
   detail_source?: SafeCodexLimitSource;
   name: string;
+  group_label?: string;
+  window_label?: string;
+  data_source?: "backend" | "unknown";
   metered_feature?: string;
   model?: string;
   unit?: string;
@@ -32,6 +36,9 @@ export interface SafeCodexLimitDetail {
   key: string;
   label: string;
   source: SafeCodexLimitSource;
+  group_label: string | null;
+  window_label: string | null;
+  data_source: "backend" | "unknown";
   status: SafeCodexLimitStatus;
   name: string | null;
   metered_feature: string | null;
