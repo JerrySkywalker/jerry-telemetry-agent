@@ -118,6 +118,7 @@ Expected success diagnostics:
 - `docker_compose_run_once=ok`
 - `status_ok=true`
 - `limits_count` greater than zero
+- Backend completeness checks should prefer `limits_detail[]` window rows when present: `default:5h`, `default:weekly`, `additional:GPT-5.3-Codex-Spark:5h`, and `additional:GPT-5.3-Codex-Spark:weekly`.
 - `http_upload=disabled`
 - `daemon_enabled=false`
 
@@ -154,6 +155,7 @@ Expected success diagnostics:
 - `docker_compose_run_once=ok`
 - `snapshot_status_ok=true`
 - `snapshot_limits_count` greater than zero
+- Required backend-derived window rows are present before upload: default 5h, default weekly, Spark 5h, and Spark weekly.
 - `snapshot_node_id=us-lax-pro-01`
 - `http_upload=attempted_once`
 - `daemon_enabled=false`

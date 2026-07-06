@@ -35,6 +35,8 @@ The agent does not call OAuth refresh endpoints. Codex CLI remains responsible f
 
 The raw response is normalized internally and discarded. Sinks receive only `codex.usage.snapshot`; raw account IDs, user IDs, email, promo, referral beacon, auth tokens, and the full raw response are never emitted.
 
+When the backend reports nested quota windows, the normalizer emits one safe `limits_detail[]` row per window with `group_label`, `window_label`, `remaining_percent`, `used_percent`, reset, and window duration fields when reported or safely derivable from reported percent complements. This is backend-derived data only; `/status` UI text is not captured or parsed for this collector.
+
 ## file
 
 Migration fallback only. Reads `CODEX_STATUS_LATEST_PATH`, validates it as Codex latest JSON, redacts sensitive fields, and adapts it to `codex.usage.snapshot`.

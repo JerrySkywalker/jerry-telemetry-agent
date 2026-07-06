@@ -17,14 +17,15 @@ export function normalizeCodexUsage(raw: unknown, config: Config, observedAt = n
     return errorSnapshot(config, "schema_error", "Codex usage response was not an object", observedAt);
   }
   const record = raw as Record<string, unknown>;
-  const defaultLimit = normalizeLimit(record.rate_limit, "default", "default", observedAt);
-  const additional = Array.isArray(record.additional_rate_limits)
-    ? record.additional_rate_limits.map((item) => normalizeLimit(item, "additional", undefined, observedAt)).filter((item): item is CodexRateLimit => Boolean(item))
-    : [];
+  const explicitLimits = [
+    ...normalizeLimitRows(record.rate_limit, "default", "default", observedAt, "default"),
+    ...(Array.isArray(record.additional_rate_limits)
+      ? record.additional_rate_limits.flatMap((item) => normalizeLimitRows(item, "additional", undefined, observedAt, "additional"))
+      : [])
+  ];
   const backendLimits = Array.isArray(record.limits)
-    ? record.limits.map((item) => normalizeBackendLimit(item, observedAt)).filter((item): item is CodexRateLimit => Boolean(item))
+    ? record.limits.flatMap((item) => normalizeBackendLimit(item, observedAt))
     : [];
-  const explicitLimits = [defaultLimit, ...additional].filter((item): item is CodexRateLimit => Boolean(item));
   const limits = backendLimits.length > 0 ? backendLimits : explicitLimits;
   const limitsDetail = limits.map((limit, index) => limitToDetail(limit, index, observedAt));
 
@@ -161,12 +162,47 @@ export function summarizeCodexUsage(snapshot: CodexUsageSnapshot, lastSuccessAt?
   };
 }
 
-function normalizeBackendLimit(value: unknown, observedAt: string): CodexRateLimit | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+interface LimitWindowCandidate {
+  key: string;
+  label?: string;
+  value: Record<string, unknown>;
+}
+
+function normalizeBackendLimit(value: unknown, observedAt: string): CodexRateLimit[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
   const record = value as Record<string, unknown>;
   const detailSource = limitSource(record);
   const scope = detailSource === "default" ? "default" : "additional";
-  return normalizeLimit(value, scope, undefined, observedAt, detailSource);
+  return normalizeLimitRows(value, scope, undefined, observedAt, detailSource);
+}
+
+function normalizeLimitRows(
+  value: unknown,
+  scope: "default" | "additional",
+  fallbackName: string | undefined,
+  observedAt: string,
+  detailSource: CodexRateLimit["detail_source"],
+  parent?: Record<string, unknown>
+): CodexRateLimit[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const record = value as Record<string, unknown>;
+  const parentName = parent ? limitName(parent, fallbackName) : fallbackName;
+  const ownName = limitName(record, parentName);
+  const nestedRateLimit = record.rate_limit;
+  if (nestedRateLimit && typeof nestedRateLimit === "object" && !Array.isArray(nestedRateLimit)) {
+    const nestedRows = normalizeLimitRows(nestedRateLimit, scope, ownName, observedAt, detailSource, record);
+    if (nestedRows.length > 0) return nestedRows;
+  }
+
+  const windows = collectWindowCandidates(record);
+  if (windows.length > 0) {
+    return windows
+      .map((window) => normalizeLimit(window.value, scope, ownName, observedAt, detailSource, parent, window))
+      .filter((item): item is CodexRateLimit => Boolean(item));
+  }
+
+  const limit = normalizeLimit(record, scope, ownName, observedAt, detailSource, parent);
+  return limit ? [limit] : [];
 }
 
 function normalizeLimit(
@@ -174,12 +210,16 @@ function normalizeLimit(
   scope: "default" | "additional",
   fallbackName?: string,
   observedAt?: string,
-  detailSource: CodexRateLimit["detail_source"] = scope
+  detailSource: CodexRateLimit["detail_source"] = scope,
+  parent?: Record<string, unknown>,
+  windowCandidate?: LimitWindowCandidate
 ): CodexRateLimit | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record = value as Record<string, unknown>;
   const used = percentValue(pickNumber(record, ["used_percent", "percent_used", "usage_percent"]));
   const remaining = percentValue(pickNumber(record, ["remaining_percent", "percent_remaining"]));
+  const usedPercent = used ?? (remaining === undefined ? undefined : Math.max(0, 100 - remaining));
+  const remainingPercent = remaining ?? (used === undefined ? undefined : Math.max(0, 100 - used));
   const absoluteReset = normalizeResetAt(pickValue(record, ["reset_at", "resetAt", "reset_time", "resetTime", "reset_at_iso", "resets_at"]));
   const resetInSeconds = pickNumber(record, ["reset_in_seconds", "reset_after_seconds", "seconds_until_reset"]);
   const derivedResetAtIso = absoluteReset?.iso ?? deriveResetAtIso(observedAt, resetInSeconds);
@@ -190,23 +230,33 @@ function normalizeLimit(
       : resetInSeconds !== undefined
         ? "backend_relative"
         : undefined;
+  const rawWindowSeconds = pickNumber(record, ["window_seconds", "period_seconds", "interval_seconds", "quota_window_seconds", "limit_window_seconds"]);
+  const windowLabel = normalizeWindowLabel(
+    pickString(record, ["window_label", "window", "period", "interval"]),
+    rawWindowSeconds,
+    windowCandidate
+  );
+  const windowSeconds = rawWindowSeconds ?? windowSecondsFromLabel(windowLabel);
+  const groupLabel = inferGroupLabel(record, parent, scope, fallbackName);
+  const name = limitName(record, fallbackName) ?? groupLabel ?? (scope === "default" ? "default" : "additional");
   return {
     scope,
     detail_source: detailSource,
-    name:
-      pickString(record, ["limit_name", "name", "label", "display_name", "metered_feature", "model", "model_slug"]) ??
-      fallbackName ??
-      "additional",
-    metered_feature: pickString(record, ["metered_feature"]),
-    model: pickString(record, ["model", "model_slug"]),
-    unit: pickString(record, ["unit"]),
+    name,
+    group_label: groupLabel,
+    window_label: windowLabel,
+    data_source: "backend",
+    metered_feature: pickString(record, ["metered_feature"]) ?? (parent ? pickString(parent, ["metered_feature"]) : undefined),
+    model: pickString(record, ["model", "model_slug"]) ?? (parent ? pickString(parent, ["model", "model_slug"]) : undefined),
+    unit: pickString(record, ["unit"]) ?? (parent ? pickString(parent, ["unit"]) : undefined),
     total: pickNumber(record, ["total", "limit", "quota", "cap", "max", "amount", "credits_total"]),
     used: pickNumber(record, ["used", "consumed", "spent", "credits_used"]),
     remaining: pickNumber(record, ["remaining", "available", "left", "credits_remaining"]),
-    used_percent: used,
-    remaining_percent: remaining ?? (used === undefined ? undefined : Math.max(0, 100 - used)),
+    used_percent: usedPercent,
+    remaining_percent: remainingPercent,
     window: compactObject({
-      window_seconds: pickNumber(record, ["window_seconds", "period_seconds", "interval_seconds", "quota_window_seconds", "limit_window_seconds"]),
+      window_label: windowLabel,
+      window_seconds: windowSeconds,
       reset_at_epoch: absoluteReset?.epoch,
       reset_at_iso: derivedResetAtIso,
       reset_in_seconds: resetInSeconds,
@@ -215,10 +265,87 @@ function normalizeLimit(
   };
 }
 
+function collectWindowCandidates(record: Record<string, unknown>): LimitWindowCandidate[] {
+  const candidates: LimitWindowCandidate[] = [];
+  for (const [key, value] of Object.entries(record)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    if (!isWindowObjectKey(key) && !hasLimitWindowFields(value as Record<string, unknown>)) continue;
+    candidates.push({
+      key,
+      label: windowLabelFromKey(key),
+      value: value as Record<string, unknown>
+    });
+  }
+  return candidates;
+}
+
+function hasLimitWindowFields(record: Record<string, unknown>): boolean {
+  return (
+    pickNumber(record, ["used_percent", "percent_used", "usage_percent", "remaining_percent", "percent_remaining"]) !== undefined &&
+    (pickNumber(record, ["window_seconds", "period_seconds", "interval_seconds", "quota_window_seconds", "limit_window_seconds"]) !== undefined ||
+      pickNumber(record, ["reset_in_seconds", "reset_after_seconds", "seconds_until_reset"]) !== undefined ||
+      pickValue(record, ["reset_at", "resetAt", "reset_time", "resetTime", "reset_at_iso", "resets_at"]) !== undefined)
+  );
+}
+
+function isWindowObjectKey(key: string): boolean {
+  return /(^|_)(primary|secondary|weekly|week|5h|five_hour|five_hourly|window|period)(_window)?$/i.test(key);
+}
+
+function windowLabelFromKey(key: string): string | undefined {
+  const normalized = key.toLowerCase();
+  if (normalized.includes("secondary") || normalized.includes("weekly") || normalized.includes("week")) return "weekly";
+  if (normalized.includes("primary") || normalized.includes("5h") || normalized.includes("five_hour")) return "5h";
+  return undefined;
+}
+
+function normalizeWindowLabel(raw: string | undefined, windowSeconds: number | undefined, windowCandidate?: LimitWindowCandidate): string | undefined {
+  if (windowSeconds !== undefined) {
+    const rounded = Math.round(windowSeconds);
+    if (rounded === 18_000) return "5h";
+    if (rounded === 604_800) return "weekly";
+  }
+  const text = `${raw ?? ""} ${windowCandidate?.label ?? ""} ${windowCandidate?.key ?? ""}`.toLowerCase();
+  if (text.includes("weekly") || text.includes("week") || text.includes("secondary")) return "weekly";
+  if (text.includes("5h") || text.includes("5 h") || text.includes("five_hour") || text.includes("primary")) return "5h";
+  return raw ? sanitizeTelemetryString(raw) : undefined;
+}
+
+function windowSecondsFromLabel(label: string | undefined): number | undefined {
+  if (label === "5h") return 18_000;
+  if (label === "weekly") return 604_800;
+  return undefined;
+}
+
+function limitName(record: Record<string, unknown>, fallbackName?: string): string | undefined {
+  return pickString(record, ["limit_name", "name", "label", "display_name", "metered_feature", "model", "model_slug"]) ?? fallbackName;
+}
+
+function inferGroupLabel(
+  record: Record<string, unknown>,
+  parent: Record<string, unknown> | undefined,
+  scope: "default" | "additional",
+  fallbackName?: string
+): string | undefined {
+  if (scope === "default") return "default";
+  const raw =
+    limitName(parent ?? {}, undefined) ??
+    limitName(record, undefined) ??
+    pickString(parent ?? {}, ["metered_feature", "model", "model_slug"]) ??
+    pickString(record, ["metered_feature", "model", "model_slug"]) ??
+    fallbackName;
+  if (!raw) return undefined;
+  const text = raw.toLowerCase();
+  if (text.includes("gpt-5.3-codex-spark") || text.includes("spark")) return "GPT-5.3-Codex-Spark";
+  return sanitizeTelemetryString(raw);
+}
+
 function limitToDetail(limit: CodexRateLimit, index: number, observedAt: string): SafeCodexLimitDetail {
   const source = limit.detail_source ?? limit.scope;
   const resetAtIso = limit.window?.reset_at_iso ?? null;
   const resetInSeconds = limit.window?.reset_in_seconds ?? secondsUntilReset(observedAt, resetAtIso);
+  const windowLabel = limit.window_label ?? limit.window?.window_label ?? null;
+  const groupLabel = limit.group_label ?? (limit.scope === "default" ? "default" : null);
   const reported = [
     limit.total,
     limit.used,
@@ -229,11 +356,22 @@ function limitToDetail(limit: CodexRateLimit, index: number, observedAt: string)
     limit.window?.reset_in_seconds,
     limit.window?.window_seconds
   ].some((item) => item !== undefined && item !== null);
-  const complete = limit.total !== undefined && limit.used !== undefined && limit.remaining !== undefined && resetAtIso !== null;
+  const fullAbsolute = limit.total !== undefined && limit.used !== undefined && limit.remaining !== undefined && resetAtIso !== null;
+  const fullStatusEquivalent = Boolean(
+    windowLabel &&
+      (limit.used_percent !== undefined || limit.remaining_percent !== undefined) &&
+      (resetAtIso !== null || resetInSeconds !== null) &&
+      limit.window?.window_seconds !== undefined
+  );
+  const complete = fullAbsolute || fullStatusEquivalent;
+  const label = windowLabel && groupLabel ? `${groupLabel} ${windowLabel}` : limit.name || (limit.scope === "default" ? "Default" : "Additional");
   return {
-    key: `${source}:${limit.name || index}`,
-    label: limit.name || (limit.scope === "default" ? "Default" : "Additional"),
+    key: detailKey(source, limit, windowLabel, groupLabel, index),
+    label,
     source,
+    group_label: groupLabel,
+    window_label: windowLabel,
+    data_source: limit.data_source ?? "unknown",
     status: limitStatus(limit),
     name: limit.name ?? null,
     metered_feature: limit.metered_feature ?? null,
@@ -250,6 +388,14 @@ function limitToDetail(limit: CodexRateLimit, index: number, observedAt: string)
     reset_source: limit.window?.reset_source ?? (resetAtIso ? "backend_absolute" : "not_reported"),
     completeness: complete ? "full" : reported ? "partial" : "not_reported"
   };
+}
+
+function detailKey(source: SafeCodexLimitDetail["source"], limit: CodexRateLimit, windowLabel: string | null, groupLabel: string | null, index: number): string {
+  if (windowLabel) {
+    if (source === "additional" && groupLabel) return `${source}:${groupLabel}:${windowLabel}`;
+    if (source === "default") return `default:${windowLabel}`;
+  }
+  return `${source}:${limit.name || index}`;
 }
 
 function limitStatus(limit: CodexRateLimit): SafeCodexLimitDetail["status"] {

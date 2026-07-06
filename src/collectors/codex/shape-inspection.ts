@@ -47,7 +47,15 @@ const LIMIT_FIELD_CANDIDATES = [
   "metered_feature",
   "model",
   "model_slug",
-  "unit"
+  "unit",
+  "group_label",
+  "window_label",
+  "window",
+  "period",
+  "interval",
+  "primary_window",
+  "secondary_window",
+  "rate_limit"
 ] as const;
 
 export function inspectCodexUsageShape(raw: unknown): RedactedShapeField[] {
@@ -79,19 +87,31 @@ export function inspectCodexUsageShape(raw: unknown): RedactedShapeField[] {
 function collectLimitSamples(record: Record<string, unknown>): Record<string, unknown>[] {
   const samples: Record<string, unknown>[] = [];
   if (record.rate_limit && typeof record.rate_limit === "object" && !Array.isArray(record.rate_limit)) {
-    samples.push(record.rate_limit as Record<string, unknown>);
+    collectLimitSamplesFromRecord(record.rate_limit as Record<string, unknown>, samples);
   }
   if (Array.isArray(record.additional_rate_limits)) {
     for (const item of record.additional_rate_limits) {
-      if (item && typeof item === "object" && !Array.isArray(item)) samples.push(item as Record<string, unknown>);
+      if (item && typeof item === "object" && !Array.isArray(item)) collectLimitSamplesFromRecord(item as Record<string, unknown>, samples);
     }
   }
   if (Array.isArray(record.limits)) {
     for (const item of record.limits) {
-      if (item && typeof item === "object" && !Array.isArray(item)) samples.push(item as Record<string, unknown>);
+      if (item && typeof item === "object" && !Array.isArray(item)) collectLimitSamplesFromRecord(item as Record<string, unknown>, samples);
     }
   }
   return samples;
+}
+
+function collectLimitSamplesFromRecord(record: Record<string, unknown>, samples: Record<string, unknown>[]): void {
+  samples.push(record);
+  const nested = record.rate_limit;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    collectLimitSamplesFromRecord(nested as Record<string, unknown>, samples);
+  }
+  for (const key of ["primary_window", "secondary_window"] as const) {
+    const value = record[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) samples.push(value as Record<string, unknown>);
+  }
 }
 
 function firstPresent(records: Record<string, unknown>[], key: string): unknown {
