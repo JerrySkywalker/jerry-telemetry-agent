@@ -7,7 +7,7 @@
   "collectors": [
     { "name": "node-info", "enabled": true, "interval_seconds": 60 },
     { "name": "node-resources", "enabled": true, "interval_seconds": 60 },
-    { "name": "service-health", "enabled": true, "interval_seconds": 60 },
+    { "name": "service-health", "enabled": false, "interval_seconds": 60 },
     {
       "name": "http-probe",
       "enabled": true,
@@ -54,7 +54,7 @@
     },
     {
       "name": "custom-json",
-      "enabled": true,
+      "enabled": false,
       "files": [
         { "name": "beijing-main-safe-example", "path": "deploy/examples/custom/example.safe.json" }
       ]
