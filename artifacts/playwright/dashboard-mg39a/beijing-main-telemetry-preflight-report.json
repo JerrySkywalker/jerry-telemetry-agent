@@ -1,0 +1,201 @@
+{
+  "goal": "MG-39A",
+  "working_repo": "jerry-telemetry-agent",
+  "node": {
+    "node_id": "beijing-main-01",
+    "hostname": "tencent-pek-01",
+    "region": "cn-beijing",
+    "role": "main-hub-dashboard",
+    "provider": "tencent-cloud"
+  },
+  "git": {
+    "base_branch": "main",
+    "branch": "mg39a-beijing-main-telemetry-preflight",
+    "base_commit": "13b0cb068c47bffeacecac842e52ef1971175df5",
+    "git_fetch_origin_prune": "pass",
+    "git_checkout_main": "pass",
+    "git_pull_ff_only_origin_main": "pass",
+    "git_status_short": "dirty_untracked_preexisting",
+    "untracked_groups": ["..smoke", "artifacts", "fixtures/readmodel"]
+  },
+  "local_preflight": {
+    "npm_run_typecheck": "pass",
+    "npm_test": "pass",
+    "npm_test_files": "30 passed",
+    "npm_test_cases": "156 passed",
+    "npm_run_build": "pass",
+    "git_diff_check": "pass",
+    "validate_local": "pass",
+    "scan_secrets_light": "pass",
+    "release_gate_local": "pass"
+  },
+  "source_audit": {
+    "generic_server_agent_supported": true,
+    "node_snapshot_supported": true,
+    "node_resources_supported": true,
+    "service_health_supported": true,
+    "docker_containers_supported": true,
+    "systemd_units_supported": true,
+    "http_probe_supported": true,
+    "batch_hub_upload_supported": true,
+    "install_dry_run_supported": true,
+    "rollback_plan_supported": true
+  },
+  "beijing_inventory": {
+    "ssh_beijing_used": true,
+    "production_touched": false,
+    "beijing_touched": "read_only",
+    "beijing_hostname": "tencent-pek-01",
+    "beijing_os": "Linux 6.8.0-124-generic x86_64 GNU/Linux",
+    "beijing_docker_running": true,
+    "beijing_hub_container_running": true,
+    "beijing_dashboard_container_running": true,
+    "beijing_openresty_running": true,
+    "beijing_authelia_running": true,
+    "beijing_halo_running": true,
+    "beijing_hermes_running": true,
+    "beijing_message_gateway_running": false,
+    "beijing_local_hub_healthz_status": "200",
+    "beijing_dashboard_health_status": "root_200_healthz_404",
+    "beijing_openresty_local_root_status": "200",
+    "beijing_candidate_services": [
+      "docker.service",
+      "jerry-telemetry-hub-canary-reverse-tunnel.service",
+      "jerry-telemetry-hub-canary.service"
+    ]
+  },
+  "planned_config": {
+    "beijing_config_path": "deploy/examples/beijing-main-agent.node.json",
+    "beijing_config_valid": true,
+    "beijing_collectors": [
+      "node-info",
+      "node-resources",
+      "service-health",
+      "http-probe",
+      "docker-containers",
+      "systemd-units",
+      "custom-json",
+      "agent-health"
+    ],
+    "beijing_service_targets": [
+      {
+        "name": "telemetry-hub-healthz",
+        "url": "http://127.0.0.1:3000/healthz",
+        "expected_status": 200
+      },
+      {
+        "name": "glance-dashboard-root",
+        "url": "http://127.0.0.1:18090/",
+        "expected_status": 200
+      },
+      {
+        "name": "openresty-root",
+        "url": "http://127.0.0.1/",
+        "expected_status": 200
+      },
+      {
+        "name": "authelia",
+        "status": "planned_endpoint_unknown"
+      },
+      {
+        "name": "hermes",
+        "status": "planned_endpoint_unknown"
+      },
+      {
+        "name": "message-gateway",
+        "status": "not_present_in_read_only_inventory"
+      }
+    ],
+    "docker_allowlist": [
+      "*telemetry-hub*",
+      "*jerry-glance-dashboard*",
+      "*openresty*",
+      "*authelia*",
+      "*hermes*"
+    ],
+    "systemd_units": [
+      "docker.service",
+      "jerry-telemetry-hub-canary.service",
+      "jerry-telemetry-hub-canary-reverse-tunnel.service"
+    ],
+    "arbitrary_command_collectors": false
+  },
+  "hub_write_secret_readiness": {
+    "hub_accepts_beijing_main_node_write": false,
+    "beijing_main_write_secret_present": false,
+    "beijing_main_key_rotation_needed": false,
+    "hub_secret_mutation_needed": true,
+    "secret_values_printed": false,
+    "secret_hashes_printed": false,
+    "evidence": {
+      "hub_env_file_present": true,
+      "hub_env_has_node_secrets_key": true,
+      "hub_env_mentions_beijing_main_01": false,
+      "hub_env_mentions_lax_node": true
+    }
+  },
+  "local_file_only_smoke": {
+    "doctor_agent_config": "pass",
+    "server_agent_once_file_only": "pass",
+    "smoke_server_agent": "pass",
+    "local_file_only_batch_written": true,
+    "local_file_only_event_families": [
+      "node.snapshot",
+      "node.resources.snapshot",
+      "service.health.snapshot",
+      "docker.containers.snapshot",
+      "systemd.units.snapshot",
+      "custom.snapshot",
+      "telemetry.agent.health"
+    ],
+    "local_file_only_secret_scan_pass": true,
+    "upload_attempted": false
+  },
+  "install_upgrade_dry_run": {
+    "install_dry_run_passed": true,
+    "upgrade_dry_run_passed": true,
+    "package_agent_local_passed": true,
+    "planned_remote_root": "/opt/jerry-telemetry-agent",
+    "planned_state_dir": "/var/lib/jerry-telemetry-agent",
+    "planned_log_dir": "/var/log/jerry-telemetry-agent",
+    "planned_service_mode": "systemd_daemon",
+    "planned_backup_path_pattern": "timestamped operator-selected backup of /opt/jerry-telemetry-agent and config",
+    "planned_rollback_available": true
+  },
+  "production_hub_readback": {
+    "prod_healthz_status": "200",
+    "prod_read_token_available": true,
+    "prod_fleet_status": "not_verified_auth_failed_401",
+    "prod_fleet_beijing_main_status": "not_found_after_401",
+    "prod_fleet_beijing_not_instrumented": "not_verified_auth_failed_401",
+    "prod_fleet_lax_online": "not_verified_auth_failed_401",
+    "prod_pipeline_status": "not_verified_auth_failed_401",
+    "prod_nodes_status": "not_verified_auth_failed_401",
+    "prod_summary_status": "not_verified_auth_failed_401",
+    "read_model_http_status_with_dashboard_token": {
+      "fleet_overview": "401",
+      "pipelines_overview": "401",
+      "nodes": "401",
+      "summary": "401"
+    }
+  },
+  "readiness": {
+    "beijing_agent_deployment_ready": false,
+    "hub_secret_ready": false,
+    "beijing_service_targets_ready": false,
+    "beijing_config_ready": true,
+    "next_recommended_goal": "MG-39S authorized Hub node-secret registration for beijing-main-01"
+  },
+  "safety": {
+    "production_touched": false,
+    "secrets_visible": false,
+    "dashboard_deployed": false,
+    "agent_deployed": false,
+    "hub_deployed": false,
+    "onepanel_touched": false,
+    "cloudflare_touched": false,
+    "authelia_touched": false,
+    "openresty_touched": false,
+    "lax_mutation": false
+  }
+}
