@@ -1,0 +1,64 @@
+{
+  "node_id": "beijing-main-01",
+  "hostname": "tencent-pek-01",
+  "region": "cn-beijing",
+  "role": "main-hub-dashboard",
+  "provider": "tencent-cloud",
+  "collectors": [
+    { "name": "node-info", "enabled": true, "interval_seconds": 60 },
+    { "name": "node-resources", "enabled": true, "interval_seconds": 60 },
+    { "name": "service-health", "enabled": true, "interval_seconds": 60 },
+    {
+      "name": "http-probe",
+      "enabled": true,
+      "targets": [
+        {
+          "name": "telemetry-hub-healthz",
+          "url": "http://127.0.0.1:3000/healthz",
+          "expected_status": 200,
+          "timeout_ms": 2000
+        },
+        {
+          "name": "glance-dashboard-root",
+          "url": "http://127.0.0.1:18090/",
+          "expected_status": 200,
+          "timeout_ms": 2000
+        },
+        {
+          "name": "openresty-root",
+          "url": "http://127.0.0.1/",
+          "expected_status": 200,
+          "timeout_ms": 2000
+        }
+      ]
+    },
+    {
+      "name": "docker-containers",
+      "enabled": true,
+      "allowlist": [
+        "*telemetry-hub*",
+        "*jerry-glance-dashboard*",
+        "*openresty*",
+        "*authelia*",
+        "*hermes*"
+      ]
+    },
+    {
+      "name": "systemd-units",
+      "enabled": true,
+      "units": [
+        "docker.service",
+        "jerry-telemetry-hub-canary.service",
+        "jerry-telemetry-hub-canary-reverse-tunnel.service"
+      ]
+    },
+    {
+      "name": "custom-json",
+      "enabled": true,
+      "files": [
+        { "name": "beijing-main-safe-example", "path": "deploy/examples/custom/example.safe.json" }
+      ]
+    },
+    { "name": "agent-health", "enabled": true, "interval_seconds": 60 }
+  ]
+}
