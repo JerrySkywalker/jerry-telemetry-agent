@@ -25,6 +25,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Initialize toolchain PATH
+        shell: pwsh
+        run: |
+          $candidatePaths = @(
+            "$env:ProgramFiles\Git\cmd",
+            "$env:ProgramFiles\nodejs",
+            "$env:ProgramFiles\Docker\Docker\resources\bin",
+            "$env:ProgramFiles\PowerShell\7"
+          )
+          $existingPaths = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ }
+          foreach ($path in $existingPaths) {
+            Add-Content -LiteralPath $env:GITHUB_PATH -Value $path
+          }
+          $env:Path = (($existingPaths + ($env:Path -split ";" | Where-Object { $_ })) -join ";")
+
       - name: Show toolchain
         shell: pwsh
         run: |
