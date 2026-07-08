@@ -1,22 +1,85 @@
-name: CI
+name: Jerry CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      gate:
+        description: Gate to run
+        required: true
+        default: ci-local
+        type: choice
+        options:
+          - ci-local
+          - release-gate-local
+
+permissions:
+  contents: read
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, jerry-ci, jerry-ci-win, p0, agent]
+    timeout-minutes: 60
     steps:
+      - name: Initialize toolchain PATH
+        shell: pwsh
+        run: |
+          $candidatePaths = @(
+            "$env:ProgramFiles\Git\cmd",
+            "$env:ProgramFiles\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\cmd",
+            "$env:ProgramFiles\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\mingw64\bin",
+            "$env:ProgramFiles\Microsoft Visual Studio\17\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\cmd",
+            "$env:ProgramFiles\Microsoft Visual Studio\17\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\mingw64\bin",
+            "$env:ProgramFiles\nodejs",
+            "$env:ProgramFiles\Docker\Docker\resources\bin",
+            "$env:ProgramFiles\PowerShell\7"
+          )
+          $existingPaths = foreach ($candidatePath in $candidatePaths) {
+            try {
+              if (Test-Path -LiteralPath $candidatePath -PathType Container -ErrorAction Stop) {
+                $candidatePath
+              }
+            } catch {
+            }
+          }
+          foreach ($path in $existingPaths) {
+            Add-Content -LiteralPath $env:GITHUB_PATH -Value $path
+          }
+          $env:Path = (($existingPaths + ($env:Path -split ";" | Where-Object { $_ })) -join ";")
+
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: docker compose config
+
+      - name: Show toolchain
+        shell: pwsh
+        run: |
+          git --version
+          node --version
+          npm --version
+          pwsh --version
+
+      - name: Install dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Run selected gate
+        shell: pwsh
+        run: |
+          $gate = "${{ github.event.inputs.gate }}"
+          if ([string]::IsNullOrWhiteSpace($gate)) {
+            $gate = "ci-local"
+          }
+
+          if ($gate -eq "ci-local") {
+            npm run ci:local
+          } elseif ($gate -eq "release-gate-local") {
+            npm run release:gate:local
+          } else {
+            throw "Unknown gate: $gate"
+          }
