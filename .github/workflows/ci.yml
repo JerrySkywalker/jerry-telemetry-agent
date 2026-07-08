@@ -23,8 +23,6 @@ jobs:
     runs-on: [self-hosted, Windows, X64, jerry-ci, jerry-ci-win, p0, agent]
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-
       - name: Initialize toolchain PATH
         shell: pwsh
         run: |
@@ -50,6 +48,13 @@ jobs:
             Add-Content -LiteralPath $env:GITHUB_PATH -Value $path
           }
           $env:Path = (($existingPaths + ($env:Path -split ";" | Where-Object { $_ })) -join ";")
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
       - name: Show toolchain
         shell: pwsh
