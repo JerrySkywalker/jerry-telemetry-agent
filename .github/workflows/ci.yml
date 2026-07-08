@@ -30,15 +30,22 @@ jobs:
         run: |
           $candidatePaths = @(
             "$env:ProgramFiles\Git\cmd",
-            "$env:USERPROFILE\scoop\apps\git\current\cmd",
-            "$env:USERPROFILE\scoop\shims",
-            "C:\Users\jerry\scoop\apps\git\current\cmd",
-            "C:\Users\jerry\scoop\shims",
+            "$env:ProgramFiles\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\cmd",
+            "$env:ProgramFiles\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\mingw64\bin",
+            "$env:ProgramFiles\Microsoft Visual Studio\17\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\cmd",
+            "$env:ProgramFiles\Microsoft Visual Studio\17\Community\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\mingw64\bin",
             "$env:ProgramFiles\nodejs",
             "$env:ProgramFiles\Docker\Docker\resources\bin",
             "$env:ProgramFiles\PowerShell\7"
           )
-          $existingPaths = $candidatePaths | Where-Object { Test-Path -LiteralPath $_ }
+          $existingPaths = foreach ($candidatePath in $candidatePaths) {
+            try {
+              if (Test-Path -LiteralPath $candidatePath -PathType Container -ErrorAction Stop) {
+                $candidatePath
+              }
+            } catch {
+            }
+          }
           foreach ($path in $existingPaths) {
             Add-Content -LiteralPath $env:GITHUB_PATH -Value $path
           }
