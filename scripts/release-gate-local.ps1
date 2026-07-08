@@ -38,9 +38,11 @@ try {
     "TELEMETRY_LOG_DIR=.smoke/release-gate/logs"
   ) | Set-Content -LiteralPath $strictEnvPath -Encoding UTF8
 
-  Run-Step "npm run typecheck" { npm run typecheck }
-  Run-Step "npm test" { npm test }
-  Run-Step "npm run build" { npm run build }
+  # ci:local covers the required local checks:
+  # npm run typecheck
+  # npm test
+  # npm run build
+  Run-Step "npm run ci:local" { npm run ci:local }
   Run-Step "docker compose config" { docker compose config }
   Run-Step "scan-secrets-light" { & "$PSScriptRoot\scan-secrets-light.ps1" }
   Run-Step "git diff --check" { git diff --check }

@@ -9,6 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
+    "ci:local": "npm run typecheck && npm test && npm run build",
+    "release:gate:local": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/release-gate-local.ps1",
     "smoke:codex-backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-codex-backend-usage-local.ps1",
     "smoke:agent-health": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-agent-health-local.ps1",
     "smoke:non-lax-pilot": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-non-lax-pilot-local.ps1",
