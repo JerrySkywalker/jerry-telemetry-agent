@@ -30,6 +30,10 @@ jobs:
         run: |
           $candidatePaths = @(
             "$env:ProgramFiles\Git\cmd",
+            "$env:USERPROFILE\scoop\apps\git\current\cmd",
+            "$env:USERPROFILE\scoop\shims",
+            "C:\Users\jerry\scoop\apps\git\current\cmd",
+            "C:\Users\jerry\scoop\shims",
             "$env:ProgramFiles\nodejs",
             "$env:ProgramFiles\Docker\Docker\resources\bin",
             "$env:ProgramFiles\PowerShell\7"
