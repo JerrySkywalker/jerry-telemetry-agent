@@ -86,7 +86,7 @@ $archiveFiles = @{}
 $zip = [IO.Compression.ZipFile]::OpenRead($artifact)
 try {
   foreach ($entry in $zip.Entries) {
-    if ($entry.FullName.EndsWith("/")) { continue }
+    if (-not $entry.Name) { continue }
     $relative = Normalize-RelativePath $entry.FullName
     Assert-True (-not $archiveFiles.ContainsKey($relative)) "artifact_duplicate_file"
     $stream = $entry.Open()
