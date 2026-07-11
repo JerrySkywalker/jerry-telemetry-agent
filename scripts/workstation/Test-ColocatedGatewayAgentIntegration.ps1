@@ -11,9 +11,34 @@ Set-StrictMode -Version Latest
 
 function Assert-True { param([bool]$Condition, [string]$Code); if (-not $Condition) { throw $Code } }
 function Get-FreeLoopbackPort {
-  $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
-  $listener.Start()
-  try { return ([Net.IPEndPoint]$listener.LocalEndpoint).Port } finally { $listener.Stop() }
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    try { $port = ([Net.IPEndPoint]$listener.LocalEndpoint).Port } finally { $listener.Stop() }
+    $existing = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+    if ($existing.Count -eq 0) { return $port }
+  }
+  throw "free_loopback_port_not_found"
+}
+function Get-FixtureProcessIds {
+  param($Process)
+  $ids = New-Object System.Collections.Generic.List[int]
+  $pending = @([int]$Process.Id)
+  while ($pending.Count -gt 0) {
+    $parent = $pending[0]
+    $pending = @($pending | Select-Object -Skip 1)
+    if (-not $ids.Contains($parent)) { $ids.Add($parent) }
+    $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$parent" -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.ProcessId })
+    foreach ($child in $children) { if (-not $ids.Contains($child)) { $pending += $child } }
+  }
+  return @($ids)
+}
+function Assert-FixtureLoopbackListener {
+  param($Process, [int]$Port, [string]$Code)
+  $processIds = @(Get-FixtureProcessIds $Process)
+  $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object { $processIds -contains [int]$_.OwningProcess })
+  Assert-True ($listeners.Count -gt 0) $Code
+  Assert-True (@($listeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) $Code
 }
 function Wait-JsonEndpoint {
   param([string]$Uri, [int]$Attempts = 60)
@@ -184,8 +209,7 @@ try {
     throw
   }
   Assert-True ($agentHealth.ok -eq $true) "agent_artifact_health_failed"
-  $agentListeners = @(Get-NetTCPConnection -State Listen -LocalPort $agentHealthPort -ErrorAction SilentlyContinue)
-  Assert-True ($agentListeners.Count -gt 0 -and @($agentListeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) "agent_listener_not_loopback_only"
+  Assert-FixtureLoopbackListener $disabledProcess $agentHealthPort "agent_listener_not_loopback_only"
   $disabledExit = Wait-FixtureProcess $disabledProcess
   if (-not ($disabledExit.completed -and $disabledExit.exit_code -eq 0)) {
     $exitCode = if ($disabledExit.completed) { [string]$disabledExit.exit_code } else { "still-running" }
@@ -285,8 +309,7 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
   Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $stateRoot "spool") -File -ErrorAction SilentlyContinue).Count -eq 0) "fixture_spool_not_empty"
 
   $stage = "listener_and_log_safety"
-  $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $gatewayPort -ErrorAction SilentlyContinue)
-  Assert-True ($listeners.Count -gt 0 -and @($listeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) "gateway_listener_not_loopback_only"
+  Assert-FixtureLoopbackListener $gatewayProcess $gatewayPort "gateway_listener_not_loopback_only"
   Assert-LogSafe $logs $fixtureSecret
 
   $result = [ordered]@{
