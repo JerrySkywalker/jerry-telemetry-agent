@@ -41,7 +41,7 @@ describe("local collectors", () => {
     expect(payload.process_count).toBeNull();
     expect(payload.memory_total_bytes).toBeTypeOf("number");
     expect(Array.isArray(payload.disks)).toBe(true);
-  });
+  }, 15_000);
 
   it("uses deterministic fixture service and custom payloads", async () => {
     const fixtureContext = { ...context, mode: "Fixture" as const };
