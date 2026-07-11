@@ -165,6 +165,7 @@ try {
   $disabledEnvLines = @(
     "AGENT_MODE=daemon", "SERVER_DAEMON_MAX_ITERATIONS=2", "TELEMETRY_OUTPUT_MODE=file",
     "TELEMETRY_NODE_CONFIG_PATH=$disabledNode", "TELEMETRY_NODE_SECRET_FILE=$secretPath",
+    "TELEMETRY_NODE_KEY_ID=fixture-key-reference", "TELEMETRY_HUB_BATCH_URL=",
     "TELEMETRY_HUB_REQUEST_TIMEOUT_MS=1000", "TELEMETRY_SERVER_BATCH_LATEST_FILE=$disabledBatch",
     "TELEMETRY_BATCH_OUTPUT_FILE=$disabledBatch", "STATE_PATH=$stateRoot\disabled-state.json",
     "SPOOL_DIR=$stateRoot\spool", "AGENT_INTERVAL_SECONDS=2", "HEALTH_SERVER_ENABLED=true",
@@ -176,7 +177,12 @@ try {
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $agentRoot "bin\Start-AgentRelease.ps1"),
     "-ReleaseRoot", $agentRoot, "-EnvPath", $disabledEnv, "-NodeConfigPath", $disabledNode
   ) $disabledOut $disabledErr
-  $agentHealth = Wait-JsonEndpoint "http://127.0.0.1:$agentHealthPort/healthz"
+  try { $agentHealth = Wait-JsonEndpoint "http://127.0.0.1:$agentHealthPort/healthz" }
+  catch {
+    $diagnostic = Get-SafeProcessDiagnostic @($disabledOut, $disabledErr) $fixtureSecret $root
+    Write-Host "agent_disabled_health_diagnostic=$diagnostic"
+    throw
+  }
   Assert-True ($agentHealth.ok -eq $true) "agent_artifact_health_failed"
   $agentListeners = @(Get-NetTCPConnection -State Listen -LocalPort $agentHealthPort -ErrorAction SilentlyContinue)
   Assert-True ($agentListeners.Count -gt 0 -and @($agentListeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) "agent_listener_not_loopback_only"
