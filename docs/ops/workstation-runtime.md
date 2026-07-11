@@ -124,6 +124,16 @@ upgrade, no-rebuild rollback, config rollback, failed activation, state/spool/
 secret preservation, status, and uninstall in a random temporary root. It
 asserts no real Windows service state or LAX runtime changes.
 
+`scripts/workstation/Test-ColocatedGatewayAgentIntegration.ps1` accepts already
+verified exact-commit Gateway and Agent artifacts. It extracts them into a
+random temporary root, boots Gateway and Agent from their bundled Node 22
+runtimes on dynamically allocated loopback ports, proves the collector emits
+nothing while disabled, then enables only a fixture node config and verifies a
+signed batch against a fixture-only mock Hub receiver. It asserts manifest
+identity, `not_configured` safe state, zero spool, no secret/log marker, no
+non-loopback listener, released ports, stopped processes, and removed fixture
+directories.
+
 MG-44P0A does not access production, use SSH, register a service, install WinSW,
 deploy a runtime, enable the collector, enable HTTP upload, read a real secret,
 or modify Hub configuration.
