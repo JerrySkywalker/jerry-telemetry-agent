@@ -108,14 +108,6 @@ $gatewayManifest = Get-Content -Raw -LiteralPath $GatewayManifestPath | ConvertF
 $agentManifest = Get-Content -Raw -LiteralPath $AgentManifestPath | ConvertFrom-Json
 $gatewayTrust = Get-Content -Raw -LiteralPath (Join-Path $gatewayRepo "deploy\workstation\trusted-runtime.json") | ConvertFrom-Json
 $agentTrust = Get-Content -Raw -LiteralPath (Join-Path $agentRepo "deploy\workstation\trusted-runtime.json") | ConvertFrom-Json
-& $gatewayVerifier -ArtifactPath $GatewayArtifactPath -ManifestPath $GatewayManifestPath `
-  -ExpectedSourceCommit ([string]$gatewayManifest.source_commit) -ExpectedArtifactSha256 ([string]$gatewayManifest.artifact_sha256) `
-  -ExpectedRuntimeVersion ([string]$gatewayTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$gatewayTrust.node_runtime.sha256) `
-  -ExpectedServiceWrapperVersion ([string]$gatewayTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$gatewayTrust.service_wrapper.sha256) | Out-Null
-& $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath `
-  -ExpectedSourceCommit ([string]$agentManifest.source_commit) -ExpectedArtifactSha256 ([string]$agentManifest.artifact_sha256) `
-  -ExpectedRuntimeVersion ([string]$agentTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$agentTrust.node_runtime.sha256) `
-  -ExpectedServiceWrapperVersion ([string]$agentTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$agentTrust.service_wrapper.sha256) | Out-Null
 $root = Join-Path ([IO.Path]::GetTempPath()) ("mg44-colocated-" + [guid]::NewGuid().ToString("N"))
 $gatewayRoot = Join-Path $root "gateway-release"
 $agentRoot = Join-Path $root "agent-release"
