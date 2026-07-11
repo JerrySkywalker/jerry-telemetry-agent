@@ -64,6 +64,7 @@ try {
   Run-Step "doctor-agent-config example" { & "$PSScriptRoot\doctor-agent-config.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -NoNetwork }
   Run-Step "doctor-agent-config strict" { & "$PSScriptRoot\doctor-agent-config.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -EnvPath $strictEnvPath -StrictProduction -NoNetwork }
   Run-Step "package-agent-local.ps1" { & "$PSScriptRoot\package-agent-local.ps1" -OutputDir ".smoke\release-gate\artifacts" }
+  Run-Step "workstation release-slot rehearsal" { & "$PSScriptRoot\workstation\Test-AgentWorkstationRelease.ps1" }
   Run-Step "install-agent-dry-run.ps1" { & "$PSScriptRoot\install-agent-dry-run.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -OutputDir ".smoke\release-gate\install-plan" }
   Run-Step "upgrade-agent-dry-run.ps1" { & "$PSScriptRoot\upgrade-agent-dry-run.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -OutputDir ".smoke\release-gate\upgrade-plan" }
   Run-Step "uninstall-agent-dry-run.ps1" { & "$PSScriptRoot\uninstall-agent-dry-run.ps1" -NodeConfigPath ".\deploy\examples\general-linux-agent.node.json" -OutputDir ".smoke\release-gate\uninstall-plan" }

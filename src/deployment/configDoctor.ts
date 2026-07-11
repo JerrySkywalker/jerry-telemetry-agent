@@ -124,7 +124,7 @@ export function parseEnvFile(file: string): Record<string, string> {
 
 function parseNodeConfigSafely(file: string, checks: DoctorCheck[]): DeclarativeNodeConfig | undefined {
   try {
-    const raw = JSON.parse(readFileSync(file, "utf8")) as unknown;
+    const raw = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")) as unknown;
     checkNoMutatingCollectorShape(raw, checks);
     const parsed = parseDeclarativeNodeConfig(raw);
     addCheck(checks, "node_config_parse", "pass", "node config parsed successfully", {
@@ -195,6 +195,10 @@ function checkLoadConfig(checks: DoctorCheck[], env: NodeJS.ProcessEnv, nodeConf
   const patched = { ...env };
   if (nodeConfigPath) patched.TELEMETRY_NODE_CONFIG_PATH = nodeConfigPath;
   if (!patched.TELEMETRY_OUTPUT_MODE) patched.TELEMETRY_OUTPUT_MODE = "file";
+  if (patched.TELEMETRY_NODE_SECRET_FILE && !patched.TELEMETRY_NODE_SECRET) {
+    patched.TELEMETRY_NODE_SECRET = "doctor-secret-reference-present";
+    delete patched.TELEMETRY_NODE_SECRET_FILE;
+  }
   try {
     const config = loadConfig(patched, mode === "LaxCodex" ? ["--daemon"] : ["--once"]);
     addCheck(checks, "output_mode", "pass", "output mode parseable", {
@@ -218,6 +222,7 @@ function checkUploadConfig(checks: DoctorCheck[], env: NodeJS.ProcessEnv, nodeCo
   const hubBatchUrl = env.TELEMETRY_HUB_BATCH_URL;
   const nodeId = env.TELEMETRY_NODE_ID || nodeConfig?.node_id;
   const secret = env.TELEMETRY_NODE_SECRET;
+  const secretFile = env.TELEMETRY_NODE_SECRET_FILE;
   const keyId = env.TELEMETRY_NODE_KEY_ID;
   const readToken = env.TELEMETRY_READ_TOKEN;
   const urls = [hubUrl, hubBatchUrl].filter((item): item is string => Boolean(item));
@@ -233,9 +238,19 @@ function checkUploadConfig(checks: DoctorCheck[], env: NodeJS.ProcessEnv, nodeCo
   addCheck(checks, "upload_node_id", !httpEnabled || nodeId ? "pass" : "fail", "upload node id checked", {
     configured: Boolean(nodeId)
   });
-  addCheck(checks, "node_secret", !httpEnabled || secret ? "pass" : "fail", "node secret presence checked", {
-    secret_present: Boolean(secret)
+  const secretFileValid = Boolean(secretFile && path.isAbsolute(secretFile) && !isRemotePath(secretFile) && existsSync(secretFile));
+  const secretConfigured = Boolean(secret) || secretFileValid;
+  addCheck(checks, "node_secret", !httpEnabled || secretConfigured ? "pass" : "fail", "node secret reference presence checked", {
+    secret_present: Boolean(secret),
+    secret_file_configured: Boolean(secretFile),
+    secret_file_present: secretFileValid,
+    ambiguous_sources: Boolean(secret && secretFile)
   });
+  if (secret && secretFile) {
+    addCheck(checks, "node_secret_source", "fail", "only one node secret source is allowed", { ambiguous_sources: true });
+  } else {
+    addCheck(checks, "node_secret_source", "pass", "node secret source is unambiguous", { ambiguous_sources: false });
+  }
   addCheck(checks, "node_secret_quality", secret && PLACEHOLDER_PATTERN.test(secret) ? "fail" : "pass", "node secret placeholder check complete", {
     secret_present: Boolean(secret),
     placeholder_detected: Boolean(secret && PLACEHOLDER_PATTERN.test(secret))

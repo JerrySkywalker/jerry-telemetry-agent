@@ -21,6 +21,12 @@ Development rules:
 - Host prerequisites should be only Docker and an installed/authenticated Codex CLI when using host-codex mode.
 - Support file mode as migration fallback.
 
+MG-44 workstation exception:
+- The co-located Message Gateway readiness collector is a separate workstation runtime; it does not replace or modify the LAX Docker runtime.
+- Its reviewed production shape is a native Windows service over immutable release slots with a bundled, digest-pinned Node 22 runtime.
+- It must default to file-only output with the collector disabled, use loopback-only Gateway and health targets, and require a protected signing-secret reference outside release slots.
+- No global Node, production Git checkout, production npm/build step, or LAX identity may be reused for this workstation boundary.
+
 PR governance:
 - `main` is stable.
 - Future Codex work should use feature branches and PRs.

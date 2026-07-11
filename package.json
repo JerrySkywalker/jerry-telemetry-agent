@@ -32,6 +32,9 @@
     "smoke:local-hub-agent-e2e": "tsx src/local-hub-agent-e2e.ts",
     "smoke:local-hub-agent-e2e:once": "tsx src/local-hub-agent-e2e.ts --mode Once",
     "smoke:local-hub-agent-e2e:daemon": "tsx src/local-hub-agent-e2e.ts --mode Daemon",
+    "smoke:workstation-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workstation/Test-AgentWorkstationRelease.ps1",
+    "smoke:workstation-colocated": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workstation/Test-ColocatedGatewayAgentIntegration.ps1",
+    "build:workstation-release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/workstation/New-AgentWorkstationRelease.ps1",
     "start": "node dist/main.js",
     "dev": "tsx src/main.ts"
   },

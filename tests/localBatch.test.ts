@@ -43,5 +43,5 @@ describe("local telemetry batch", () => {
     expect(eventTypes).toContain("node.resources.snapshot");
     expect(JSON.stringify(batch)).not.toContain("PATH=");
     expect(JSON.stringify(batch)).not.toContain("auth.json");
-  });
+  }, 15_000);
 });

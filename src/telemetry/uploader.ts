@@ -7,6 +7,7 @@ export interface TelemetryUploadConfig {
   nodeId: string;
   nodeSecret: string;
   nodeKeyId?: string;
+  timeoutMs?: number;
 }
 
 export interface UploadResult {
@@ -15,12 +16,12 @@ export interface UploadResult {
   body: string;
 }
 
-export async function uploadEvent(config: Pick<Config, "hubUrl" | "nodeId" | "nodeSecret" | "nodeKeyId">, event: unknown): Promise<UploadResult> {
-  return uploadSignedJson(config.hubUrl, config, event);
+export async function uploadEvent(config: Pick<Config, "hubUrl" | "nodeId" | "nodeSecret" | "nodeKeyId" | "hubRequestTimeoutMs">, event: unknown): Promise<UploadResult> {
+  return uploadSignedJson(config.hubUrl, config, event, config.hubRequestTimeoutMs);
 }
 
 export async function uploadBatch(config: TelemetryUploadConfig, batch: unknown): Promise<UploadResult> {
-  return uploadSignedJson(resolveBatchHubUrl(config), config, batch);
+  return uploadSignedJson(resolveBatchHubUrl(config), config, batch, config.timeoutMs);
 }
 
 export function resolveBatchHubUrl(config: Pick<TelemetryUploadConfig, "hubUrl" | "hubBatchUrl">): string {
@@ -35,7 +36,7 @@ export function resolveBatchHubUrl(config: Pick<TelemetryUploadConfig, "hubUrl" 
   throw new Error("Missing TELEMETRY_HUB_BATCH_URL; TELEMETRY_HUB_URL must end with /v1/events to derive the batch endpoint");
 }
 
-async function uploadSignedJson(url: string, config: Pick<TelemetryUploadConfig, "nodeId" | "nodeSecret" | "nodeKeyId">, payload: unknown): Promise<UploadResult> {
+async function uploadSignedJson(url: string, config: Pick<TelemetryUploadConfig, "nodeId" | "nodeSecret" | "nodeKeyId">, payload: unknown, timeoutMs = 5000): Promise<UploadResult> {
   const rawBody = JSON.stringify(payload);
   const signedHeaders = signTelemetryBody(config.nodeId, config.nodeSecret, rawBody);
   const headers: Record<string, string> = {
@@ -49,7 +50,8 @@ async function uploadSignedJson(url: string, config: Pick<TelemetryUploadConfig,
   const response = await fetch(url, {
     method: "POST",
     headers,
-    body: rawBody
+    body: rawBody,
+    signal: AbortSignal.timeout(timeoutMs)
   });
   const body = await response.text();
   if (!response.ok) {

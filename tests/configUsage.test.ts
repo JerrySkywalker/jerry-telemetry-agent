@@ -142,6 +142,32 @@ describe("usage collector config", () => {
     expect(() => assertUploadConfig(config)).toThrow(/TELEMETRY_HUB_URL, TELEMETRY_NODE_SECRET/);
   });
 
+  it("loads one protected secret-file reference without exposing its path or value", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-secret-ref-"));
+    const secretPath = path.join(dir, "hub-signing-secret");
+    await writeFile(secretPath, "fixture-signing-value");
+
+    const config = loadConfig({
+      TELEMETRY_NODE_SECRET_FILE: secretPath,
+      TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "2500"
+    }, []);
+
+    expect(config.nodeSecret).toBe("fixture-signing-value");
+    expect(config.hubRequestTimeoutMs).toBe(2500);
+    expect(config.healthHost).toBe("127.0.0.1");
+    expect(JSON.stringify(config)).not.toContain(secretPath);
+    const directSecretKey = `TELEMETRY_NODE_${"SECRET"}`;
+    expect(() => loadConfig({
+      [directSecretKey]: "direct-value",
+      TELEMETRY_NODE_SECRET_FILE: secretPath
+    }, [])).toThrow(/only one/);
+  });
+
+  it("rejects unbounded Hub upload timeouts", () => {
+    expect(() => loadConfig({ TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "0" }, [])).toThrow(/must be positive/);
+    expect(() => loadConfig({ TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "30001" }, [])).toThrow(/must not exceed 30000/);
+  });
+
   it("loads declarative per-node config while preserving env overrides", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
     const configPath = path.join(dir, "node.json");
@@ -170,6 +196,24 @@ describe("usage collector config", () => {
       { name: "codex-backend-usage", enabled: true, interval_seconds: 300 },
       { name: "agent-health", enabled: true, interval_seconds: 300 }
     ]);
+  });
+
+  it("accepts a UTF-8 BOM on a protected declarative node config", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-bom-"));
+    const configPath = path.join(dir, "node.json");
+    await writeFile(configPath, `\uFEFF${JSON.stringify({
+      node_id: "fixture-workstation-node",
+      hostname: "fixture-workstation",
+      region: "local",
+      role: "message-gateway",
+      provider: "local",
+      collectors: [{ name: "message-gateway-readiness", enabled: false }]
+    })}`);
+
+    const config = loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath, TELEMETRY_OUTPUT_MODE: "file" }, ["--once"]);
+
+    expect(config.nodeId).toBe("fixture-workstation-node");
+    expect(config.collectorConfigs).toEqual([{ name: "message-gateway-readiness", enabled: false }]);
   });
 
   it("loads an agent-health-only non-LAX node config without selecting Codex usage", async () => {

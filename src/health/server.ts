@@ -72,6 +72,43 @@ export function startHealthServer(config: Config): http.Server {
   return server;
 }
 
+export async function waitForHealthServerListening(server: http.Server): Promise<void> {
+  if (server.listening) return;
+  await new Promise<void>((resolve, reject) => {
+    const onListening = () => {
+      server.off("error", onError);
+      resolve();
+    };
+    const onError = (error: Error) => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    server.once("listening", onListening);
+    server.once("error", onError);
+  });
+}
+
+export async function closeHealthServer(server: http.Server, graceMs = 5_000): Promise<void> {
+  if (!server.listening) return;
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(forceTimer);
+      clearTimeout(deadlineTimer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const forceTimer = setTimeout(() => server.closeAllConnections(), graceMs);
+    const deadlineTimer = setTimeout(() => {
+      server.closeAllConnections();
+      finish(new Error("health_server_shutdown_timeout"));
+    }, graceMs * 2);
+    server.close((error) => finish(error));
+  });
+}
+
 async function readSnapshot(file: string): Promise<CodexUsageSnapshot | undefined> {
   return readJson(file) as Promise<CodexUsageSnapshot | undefined>;
 }

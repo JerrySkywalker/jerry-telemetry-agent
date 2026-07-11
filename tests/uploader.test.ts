@@ -105,4 +105,19 @@ describe("uploadBatch", () => {
 
     expect(seenHeaders["x-telemetry-key-id"]).toBeUndefined();
   });
+
+  it("bounds a hung upload", async () => {
+    const server = http.createServer(() => undefined);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("missing server address");
+
+    await expect(
+      uploadBatch(
+        { ...testConfig({ hubUrl: `http://127.0.0.1:${address.port}/v1/events` }), timeoutMs: 25 },
+        { schema_version: "v1", events: [] }
+      )
+    ).rejects.toThrow();
+    server.close();
+  });
 });
