@@ -1,0 +1,18 @@
+{
+  "schema_version": "jerry.workstation.trust.v1",
+  "service_wrapper": {
+    "name": "WinSW-x64.exe",
+    "version": "2.12.0",
+    "source": "winsw/winsw official GitHub release v2.12.0",
+    "sha256": "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da",
+    "license": "MIT",
+    "committed_binary": false
+  },
+  "node_runtime": {
+    "name": "node-v22.23.1-win-x64.zip",
+    "version": "22.23.1",
+    "source": "nodejs.org official release v22.23.1",
+    "sha256": "7df0bc9375723f4a86b3aa1b7cc73342423d9677a8df4538aca31a049e309c29",
+    "committed_binary": false
+  }
+}

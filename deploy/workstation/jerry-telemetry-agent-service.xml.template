@@ -1,0 +1,21 @@
+<service>
+  <id>JerryTelemetryAgent</id>
+  <name>Jerry Telemetry Agent</name>
+  <description>Co-located loopback Message Gateway telemetry collector.</description>
+  <executable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</executable>
+  <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "__ACTIVE_ROOT__\bin\Start-AgentRelease.ps1" -ReleaseRoot "__ACTIVE_ROOT__" -EnvPath "__ENV_PATH__" -NodeConfigPath "__NODE_CONFIG_PATH__"</arguments>
+  <workingdirectory>__ACTIVE_ROOT__</workingdirectory>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <depend>JerryMessageGateway</depend>
+  <stoptimeout>15000</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="none" />
+  <log mode="roll-by-size-time">
+    <sizeThreshold>10485760</sizeThreshold>
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <keepFiles>14</keepFiles>
+  </log>
+</service>

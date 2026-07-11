@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   assertCollectorName,
   activeUsageCollectorFromConfig,
@@ -32,6 +32,7 @@ export interface Config {
   codexTmuxSession: string;
   hubUrl: string;
   hubBatchUrl: string;
+  hubRequestTimeoutMs: number;
   nodeId: string;
   nodeSecret: string;
   nodeKeyId: string;
@@ -146,8 +147,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     codexTmuxSession: env.CODEX_TMUX_SESSION ?? "codex-status-agent",
     hubUrl: env.TELEMETRY_HUB_URL ?? "",
     hubBatchUrl: env.TELEMETRY_HUB_BATCH_URL ?? "",
+    hubRequestTimeoutMs: boundedInt(env.TELEMETRY_HUB_REQUEST_TIMEOUT_MS, 5000, 30000),
     nodeId: env.TELEMETRY_NODE_ID ?? nodeConfig?.node_id ?? "",
-    nodeSecret: env.TELEMETRY_NODE_SECRET ?? "",
+    nodeSecret: resolveNodeSecret(env),
     nodeKeyId: env.TELEMETRY_NODE_KEY_ID ?? "",
     hostname: env.TELEMETRY_HOSTNAME ?? nodeConfig?.hostname ?? os.hostname(),
     region: env.TELEMETRY_REGION ?? nodeConfig?.region ?? "",
@@ -171,13 +173,33 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
     spoolMaxBytes: int(env.SPOOL_MAX_BYTES, 10 * 1024 * 1024),
     forceSend: bool(env.FORCE_SEND, false),
     healthServerEnabled: bool(env.HEALTH_SERVER_ENABLED, false),
-    healthHost: env.HEALTH_HOST ?? "0.0.0.0",
+    healthHost: env.HEALTH_HOST ?? "127.0.0.1",
     healthPort: int(env.HEALTH_PORT, 8081),
     agentHealthEnabled,
     agentHealthEventType: "telemetry.agent.health",
     agentHealthIntervalSeconds: int(env.TELEMETRY_AGENT_HEALTH_INTERVAL_SECONDS, int(env.CODEX_USAGE_POLL_INTERVAL_SECONDS ?? env.AGENT_INTERVAL_SECONDS, 300)),
     agentHealthOutputFile: env.TELEMETRY_AGENT_HEALTH_OUTPUT_FILE ?? "/state/agent-health-latest.safe.snapshot.json"
   };
+}
+
+function boundedInt(value: string | undefined, fallback: number, maximum: number): number {
+  const parsed = int(value, fallback);
+  if (parsed > maximum) throw new Error(`Value must not exceed ${maximum}`);
+  return parsed;
+}
+
+function resolveNodeSecret(env: NodeJS.ProcessEnv): string {
+  const direct = env.TELEMETRY_NODE_SECRET?.trim() ?? "";
+  const file = env.TELEMETRY_NODE_SECRET_FILE?.trim() ?? "";
+  if (direct && file) throw new Error("Configure only one of TELEMETRY_NODE_SECRET or TELEMETRY_NODE_SECRET_FILE");
+  if (!file) return direct;
+  if (!path.isAbsolute(file) || /^[a-z][a-z0-9+.-]*:\/\//i.test(file)) {
+    throw new Error("TELEMETRY_NODE_SECRET_FILE must be an absolute local path");
+  }
+  if (!existsSync(file)) throw new Error("TELEMETRY_NODE_SECRET_FILE is missing");
+  const value = readFileSync(file, "utf8").trim();
+  if (!value || /[\r\n]/.test(value)) throw new Error("TELEMETRY_NODE_SECRET_FILE must contain one non-empty line");
+  return value;
 }
 
 function loadDeclarativeConfig(file: string | undefined): DeclarativeNodeConfig | undefined {

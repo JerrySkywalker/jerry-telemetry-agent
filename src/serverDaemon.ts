@@ -216,7 +216,8 @@ async function uploadServerBatch(config: Config, nodeConfig: DeclarativeNodeConf
       hubBatchUrl: config.hubBatchUrl,
       nodeId: nodeConfig?.node_id ?? config.nodeId,
       nodeSecret: config.nodeSecret,
-      nodeKeyId: config.nodeKeyId
+      nodeKeyId: config.nodeKeyId,
+      timeoutMs: config.hubRequestTimeoutMs
     },
     batch
   );

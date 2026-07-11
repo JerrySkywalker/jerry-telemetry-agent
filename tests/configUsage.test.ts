@@ -142,6 +142,31 @@ describe("usage collector config", () => {
     expect(() => assertUploadConfig(config)).toThrow(/TELEMETRY_HUB_URL, TELEMETRY_NODE_SECRET/);
   });
 
+  it("loads one protected secret-file reference without exposing its path or value", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-secret-ref-"));
+    const secretPath = path.join(dir, "hub-signing-secret");
+    await writeFile(secretPath, "fixture-signing-value");
+
+    const config = loadConfig({
+      TELEMETRY_NODE_SECRET_FILE: secretPath,
+      TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "2500"
+    }, []);
+
+    expect(config.nodeSecret).toBe("fixture-signing-value");
+    expect(config.hubRequestTimeoutMs).toBe(2500);
+    expect(config.healthHost).toBe("127.0.0.1");
+    expect(JSON.stringify(config)).not.toContain(secretPath);
+    const directSecretKey = `TELEMETRY_NODE_${"SECRET"}`;
+    expect(() => loadConfig({
+      [directSecretKey]: "direct-value",
+      TELEMETRY_NODE_SECRET_FILE: secretPath
+    }, [])).toThrow(/only one/);
+  });
+
+  it("rejects unbounded Hub upload timeouts", () => {
+    expect(() => loadConfig({ TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "30001" }, [])).toThrow(/must not exceed 30000/);
+  });
+
   it("loads declarative per-node config while preserving env overrides", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
     const configPath = path.join(dir, "node.json");

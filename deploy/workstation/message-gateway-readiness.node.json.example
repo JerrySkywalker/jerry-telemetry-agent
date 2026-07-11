@@ -1,0 +1,18 @@
+{
+  "node_id": "<OWNER_PROVIDED_WORKSTATION_NODE_ID>",
+  "hostname": "<OWNER_PROVIDED_WORKSTATION_HOST_LABEL>",
+  "region": "local",
+  "role": "message-gateway",
+  "provider": "local",
+  "collectors": [
+    {
+      "name": "message-gateway-readiness",
+      "enabled": false,
+      "interval_seconds": 60,
+      "target": {
+        "url": "http://127.0.0.1:<GATEWAY_LOOPBACK_PORT>/v1/telemetry/readiness",
+        "timeout_ms": 2000
+      }
+    }
+  ]
+}

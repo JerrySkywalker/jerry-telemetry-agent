@@ -22,6 +22,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     codexTmuxSession: "codex-status-agent",
     hubUrl: "http://127.0.0.1:0/telemetry",
     hubBatchUrl: "",
+    hubRequestTimeoutMs: 5000,
     nodeId: "us-lax-pro-01",
     nodeSecret: "test-secret",
     nodeKeyId: "",
