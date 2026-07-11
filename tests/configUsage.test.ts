@@ -197,6 +197,24 @@ describe("usage collector config", () => {
     ]);
   });
 
+  it("accepts a UTF-8 BOM on a protected declarative node config", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-bom-"));
+    const configPath = path.join(dir, "node.json");
+    await writeFile(configPath, `\uFEFF${JSON.stringify({
+      node_id: "fixture-workstation-node",
+      hostname: "fixture-workstation",
+      region: "local",
+      role: "message-gateway",
+      provider: "local",
+      collectors: [{ name: "message-gateway-readiness", enabled: false }]
+    })}`);
+
+    const config = loadConfig({ TELEMETRY_NODE_CONFIG_PATH: configPath, TELEMETRY_OUTPUT_MODE: "file" }, ["--once"]);
+
+    expect(config.nodeId).toBe("fixture-workstation-node");
+    expect(config.collectorConfigs).toEqual([{ name: "message-gateway-readiness", enabled: false }]);
+  });
+
   it("loads an agent-health-only non-LAX node config without selecting Codex usage", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "jta-config-"));
     const configPath = path.join(dir, "node.json");

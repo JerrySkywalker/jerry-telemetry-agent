@@ -124,7 +124,7 @@ export function parseEnvFile(file: string): Record<string, string> {
 
 function parseNodeConfigSafely(file: string, checks: DoctorCheck[]): DeclarativeNodeConfig | undefined {
   try {
-    const raw = JSON.parse(readFileSync(file, "utf8")) as unknown;
+    const raw = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")) as unknown;
     checkNoMutatingCollectorShape(raw, checks);
     const parsed = parseDeclarativeNodeConfig(raw);
     addCheck(checks, "node_config_parse", "pass", "node config parsed successfully", {

@@ -186,7 +186,7 @@ export async function retrySpooledBatches(config: Config): Promise<BatchRetryRes
 
 export async function loadServerNodeConfig(configPath: string): Promise<DeclarativeNodeConfig> {
   if (!configPath) throw new Error("Server daemon requires TELEMETRY_NODE_CONFIG_PATH");
-  return parseDeclarativeNodeConfig(JSON.parse(await readFile(configPath, "utf8")) as unknown);
+  return parseDeclarativeNodeConfig(JSON.parse((await readFile(configPath, "utf8")).replace(/^\uFEFF/, "")) as unknown);
 }
 
 export function assertServerDaemonConfig(config: Config): void {

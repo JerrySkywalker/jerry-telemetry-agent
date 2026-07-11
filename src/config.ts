@@ -204,7 +204,7 @@ function resolveNodeSecret(env: NodeJS.ProcessEnv): string {
 
 function loadDeclarativeConfig(file: string | undefined): DeclarativeNodeConfig | undefined {
   if (!file) return undefined;
-  return parseDeclarativeNodeConfig(JSON.parse(readFileSync(file, "utf8")) as unknown);
+  return parseDeclarativeNodeConfig(JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, "")) as unknown);
 }
 
 export function assertUploadConfig(config: Config): void {

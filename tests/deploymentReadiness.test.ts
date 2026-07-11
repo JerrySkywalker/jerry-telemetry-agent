@@ -37,6 +37,23 @@ describe("agent config doctor", () => {
     expect(findForbiddenTelemetryMarkers(result)).toEqual([]);
   });
 
+  it("accepts a UTF-8 BOM on a protected node config", async () => {
+    const nodeConfigPath = await writeNodeConfig({
+      node_id: "fixture-workstation-node",
+      hostname: "fixture-workstation",
+      region: "local",
+      role: "message-gateway",
+      provider: "local",
+      collectors: [{ name: "message-gateway-readiness", enabled: false }]
+    });
+    const raw = await readFile(nodeConfigPath, "utf8");
+    await writeFile(nodeConfigPath, `\uFEFF${raw}`);
+
+    const result = runAgentConfigDoctor({ nodeConfigPath, mode: "Server", noNetwork: true, env: { TELEMETRY_OUTPUT_MODE: "file" } });
+
+    expect(result.checks.find((check) => check.name === "node_config_parse")).toMatchObject({ status: "pass" });
+  });
+
   it("fails strict production checks when the upload secret is missing", async () => {
     const nodeConfigPath = await writeNodeConfig({
       node_id: "example-linux-01",

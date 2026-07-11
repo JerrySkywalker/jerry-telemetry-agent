@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import type http from "node:http";
 import { loadConfig, type Config } from "./config.js";
-import { startHealthServer } from "./health/server.js";
+import { closeHealthServer, startHealthServer, waitForHealthServerListening } from "./health/server.js";
 import { logger } from "./logger.js";
 import { runServerDaemon } from "./serverDaemon.js";
 import { buildServerStatusSummary } from "./serverStatus.js";
@@ -68,6 +68,7 @@ async function main(): Promise<void> {
   let healthServer: http.Server | undefined;
   if (parsed.config.healthServerEnabled) {
     healthServer = startHealthServer(parsed.config);
+    await waitForHealthServerListening(healthServer);
     logger.info("server daemon health server started", { host: parsed.config.healthHost, port: parsed.config.healthPort });
   }
 
@@ -75,7 +76,9 @@ async function main(): Promise<void> {
     const result = await runServerDaemon(parsed.config, { maxIterations: parsed.maxIterations, signal: controller.signal });
     logger.info("server daemon stopped", result);
   } finally {
-    healthServer?.close();
+    process.removeListener("SIGINT", abort);
+    process.removeListener("SIGTERM", abort);
+    if (healthServer) await closeHealthServer(healthServer);
   }
 }
 

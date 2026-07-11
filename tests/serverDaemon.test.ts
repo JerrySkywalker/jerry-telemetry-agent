@@ -1,9 +1,10 @@
 import http from "node:http";
+import net from "node:net";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { runServerDaemon, runServerDaemonIteration, retrySpooledBatches } from "../src/serverDaemon.js";
-import { startHealthServer } from "../src/health/server.js";
+import { closeHealthServer, startHealthServer, waitForHealthServerListening } from "../src/health/server.js";
 import { countSpooledBatches } from "../src/telemetry/spool.js";
 import { readState } from "../src/telemetry/state.js";
 import { findForbiddenTelemetryMarkers } from "../src/telemetry/forbiddenMarkers.js";
@@ -29,6 +30,14 @@ describe("server daemon", () => {
     });
     expect(JSON.stringify(state)).not.toContain("payload");
     expect(findForbiddenTelemetryMarkers(state)).toEqual([]);
+  });
+
+  it("accepts a UTF-8 BOM on the protected server node config", async () => {
+    const { config } = await fixtureConfig(["file"]);
+    const raw = await readFile(config.nodeConfigPath, "utf8");
+    await writeFile(config.nodeConfigPath, `\uFEFF${raw}`);
+
+    await expect(runServerDaemon(config, { maxIterations: 1 })).resolves.toMatchObject({ iterations: 1 });
   });
 
   it("spools a sanitized batch when upload fails", async () => {
@@ -133,6 +142,28 @@ describe("server daemon", () => {
     expect(latest).toMatchObject({ schema_version: "v1", payloads_included: false, forbidden_markers_found: false });
     expect(JSON.stringify({ status, latest })).not.toContain("\"payload\":");
     expect(findForbiddenTelemetryMarkers({ status, latest })).toEqual([]);
+  });
+
+  it("bounds health shutdown when a client leaves an incomplete request open", async () => {
+    const { config } = await fixtureConfig(["file"], { healthHost: "127.0.0.1", healthPort: 0 });
+    const server = startHealthServer(config);
+    await waitForHealthServerListening(server);
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("missing address");
+    const socket = await new Promise<net.Socket>((resolve, reject) => {
+      const onError = (error: Error) => reject(error);
+      const candidate = net.createConnection({ host: "127.0.0.1", port: address.port }, () => {
+        candidate.off("error", onError);
+        resolve(candidate);
+      });
+      candidate.once("error", onError);
+    });
+    socket.write("GET /healthz HTTP/1.1\r\nHost: fixture\r\n");
+
+    await expect(closeHealthServer(server, 10)).resolves.toBeUndefined();
+
+    expect(server.listening).toBe(false);
+    socket.destroy();
   });
 });
 
