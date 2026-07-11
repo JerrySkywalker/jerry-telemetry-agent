@@ -33,12 +33,18 @@ function Get-FixtureProcessIds {
   }
   return @($ids)
 }
-function Assert-FixtureLoopbackListener {
+function Wait-FixtureLoopbackListener {
   param($Process, [int]$Port, [string]$Code)
-  $processIds = @(Get-FixtureProcessIds $Process)
-  $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object { $processIds -contains [int]$_.OwningProcess })
-  Assert-True ($listeners.Count -gt 0) $Code
-  Assert-True (@($listeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) $Code
+  for ($attempt = 0; $attempt -lt 40; $attempt++) {
+    $processIds = @(Get-FixtureProcessIds $Process)
+    $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object { $processIds -contains [int]$_.OwningProcess })
+    if ($listeners.Count -gt 0) {
+      Assert-True (@($listeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) $Code
+      return
+    }
+    Start-Sleep -Milliseconds 250
+  }
+  throw $Code
 }
 function Wait-JsonEndpoint {
   param([string]$Uri, [int]$Attempts = 60)
@@ -180,7 +186,7 @@ try {
   $disabledBatch = Join-Path $stateRoot "disabled.batch.safe.json"
   $disabledEnv = Join-Path $configRoot "agent-disabled.env"
   $disabledEnvLines = @(
-    "AGENT_MODE=daemon", "SERVER_DAEMON_MAX_ITERATIONS=2", "TELEMETRY_OUTPUT_MODE=file",
+    "AGENT_MODE=daemon", "SERVER_DAEMON_MAX_ITERATIONS=10", "TELEMETRY_OUTPUT_MODE=file",
     "TELEMETRY_NODE_CONFIG_PATH=$disabledNode", "TELEMETRY_NODE_SECRET_FILE=$secretPath",
     "TELEMETRY_NODE_KEY_ID=fixture-key-reference", "TELEMETRY_HUB_BATCH_URL=",
     "TELEMETRY_HUB_REQUEST_TIMEOUT_MS=1000", "TELEMETRY_SERVER_BATCH_LATEST_FILE=$disabledBatch",
@@ -194,6 +200,7 @@ try {
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $agentRoot "bin\Start-AgentRelease.ps1"),
     "-ReleaseRoot", $agentRoot, "-EnvPath", $disabledEnv, "-NodeConfigPath", $disabledNode
   ) $disabledOut $disabledErr
+  Wait-FixtureLoopbackListener $disabledProcess $agentHealthPort "agent_listener_not_loopback_only"
   try { $agentHealth = Wait-JsonEndpoint "http://127.0.0.1:$agentHealthPort/healthz" }
   catch {
     $diagnostic = Get-SafeProcessDiagnostic @($disabledOut, $disabledErr) $fixtureSecret $root
@@ -201,7 +208,6 @@ try {
     throw
   }
   Assert-True ($agentHealth.ok -eq $true) "agent_artifact_health_failed"
-  Assert-FixtureLoopbackListener $disabledProcess $agentHealthPort "agent_listener_not_loopback_only"
   $disabledExit = Wait-FixtureProcess $disabledProcess
   if (-not ($disabledExit.completed -and $disabledExit.exit_code -eq 0)) {
     $exitCode = if ($disabledExit.completed) { [string]$disabledExit.exit_code } else { "still-running" }
@@ -301,7 +307,7 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
   Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $stateRoot "spool") -File -ErrorAction SilentlyContinue).Count -eq 0) "fixture_spool_not_empty"
 
   $stage = "listener_and_log_safety"
-  Assert-FixtureLoopbackListener $gatewayProcess $gatewayPort "gateway_listener_not_loopback_only"
+  Wait-FixtureLoopbackListener $gatewayProcess $gatewayPort "gateway_listener_not_loopback_only"
   Assert-LogSafe $logs $fixtureSecret
 
   $result = [ordered]@{
