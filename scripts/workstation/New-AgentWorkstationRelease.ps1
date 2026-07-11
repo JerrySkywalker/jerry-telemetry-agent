@@ -112,7 +112,8 @@ try {
     $artifactName = "jerry-telemetry-agent-$($package.version)-$sourceCommit-win-x64-node22.zip"
     $artifactPath = Join-Path $outputRoot $artifactName
     if (Test-Path -LiteralPath $artifactPath) { Remove-Item -LiteralPath $artifactPath -Force }
-    Compress-Archive -Path (Join-Path $releaseRoot "*") -DestinationPath $artifactPath -CompressionLevel Optimal
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::CreateFromDirectory($releaseRoot, $artifactPath, [IO.Compression.CompressionLevel]::Optimal, $false)
     $artifactSha = Get-Sha256 $artifactPath
     $manifestPath = "$artifactPath.manifest.json"
     [ordered]@{
