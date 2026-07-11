@@ -123,6 +123,11 @@ switch, start, loopback health, and a no-spool-growth gate. Failed upgrade
 restores and revalidates the prior pair; failed fresh install removes both active
 junctions, the service boundary, and newly created candidate slots. Interrupted
 activation blocks later mutation and is recoverable through confirmed rollback.
+A persisted first-install journal with no prior pair has a dedicated recovery
+path: it verifies the journal-owned candidate identities, removes only slots
+recorded as created by that attempt, removes active/service boundaries, preserves
+logs, state, spool, and the secret reference, and leaves the owned root
+uninstalled and retryable.
 
 Rollback rehashes the complete prior release and exact config revision before
 switching, restores the original pair if rollback health fails, and preserves
@@ -143,8 +148,9 @@ paths, node identity, headers, or raw evidence.
 rejection, fixed-entrypoint enforcement, complete dry-run config validation,
 install, upgrade, tampered-slot rejection, no-rebuild rollback, exact config
 rollback, fresh-install cleanup, failed-upgrade restoration, ownership checks,
-spool-growth acceptance, state/spool/secret preservation, status, and uninstall
-in a random temporary root. It asserts no real Windows service state or LAX
+synthetic interrupted-first-install recovery plus retry, spool-growth acceptance,
+state/spool/secret preservation, status, and uninstall in a random temporary root.
+It asserts no real Windows service state or LAX
 runtime changes.
 
 `scripts/workstation/Test-ColocatedGatewayAgentIntegration.ps1` accepts already

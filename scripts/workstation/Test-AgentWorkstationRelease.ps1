@@ -104,6 +104,38 @@ try {
   try { & $manager -Operation Install -RuntimeRoot $freshFailureRoot -ArtifactPath $c.Artifact -ManifestPath $c.Manifest -EnvPath $c.Env -NodeConfigPath $c.Node -ExpectedSourceCommit $c.Commit -ExpectedArtifactSha256 $c.ArtifactSha -ConfirmInstall -FixtureMode -SimulateHealthFailure | Out-Null } catch { $freshFailureRejected = $_.Exception.Message -match "activation_failed_rolled_back" }
   $freshStatus = (& $manager -Operation Status -RuntimeRoot $freshFailureRoot -FixtureMode) | ConvertFrom-Json
   Assert-True ($freshFailureRejected -and -not $freshStatus.installed -and -not $freshStatus.pending_recovery) "fixture_fresh_install_failure_not_cleaned"
+
+  $interruptedRoot = Join-Path $fixtureRoot "interrupted-install-runtime"
+  & $manager -Operation Install -RuntimeRoot $interruptedRoot -ArtifactPath $a.Artifact -ManifestPath $a.Manifest -EnvPath $a.Env -NodeConfigPath $a.Node -ExpectedSourceCommit $a.Commit -ExpectedArtifactSha256 $a.ArtifactSha -ConfirmInstall -FixtureMode | Out-Null
+  $interruptedInstalled = (& $manager -Operation Status -RuntimeRoot $interruptedRoot -FixtureMode) | ConvertFrom-Json
+  $interruptedCurrent = Join-Path $interruptedRoot "transactions\agent-current.json"; $interruptedPending = Join-Path $interruptedRoot "transactions\agent-pending.json"
+  Remove-Item -LiteralPath $interruptedCurrent -Force
+  [ordered]@{
+    schema_version = "jerry.workstation.activation.v1"; component = "agent"; operation = "Install"; phase = "config_switched"
+    previous_release = $null; previous_config = $null; previous_source_commit = $null; previous_artifact_sha256 = $null
+    target_release = $interruptedInstalled.active_release_id; target_config = $interruptedInstalled.active_config_id
+    target_source_commit = $a.Commit; target_artifact_sha256 = $a.ArtifactSha
+    target_release_created = $true; target_config_created = $true; maximum_spool_count = 1; recorded_at = [DateTime]::UtcNow.ToString("o")
+  } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $interruptedPending -Encoding UTF8
+  New-Item -ItemType Directory -Force -Path (Join-Path $interruptedRoot "services\agent"), (Join-Path $interruptedRoot "logs\agent") | Out-Null
+  Set-Content -LiteralPath (Join-Path $interruptedRoot "services\agent\partial-service.marker") -Value "fixture" -NoNewline
+  Set-Content -LiteralPath (Join-Path $interruptedRoot "logs\agent\preserved.log") -Value "fixture-log" -NoNewline
+  $interruptedDryRun = (& $manager -Operation Rollback -RuntimeRoot $interruptedRoot -DryRun -FixtureMode) | ConvertFrom-Json
+  Assert-True ($interruptedDryRun.recovery_mode -eq "interrupted_first_install" -and (Test-Path -LiteralPath $interruptedPending)) "fixture_interrupted_install_dry_run_invalid"
+  & $manager -Operation Rollback -RuntimeRoot $interruptedRoot -ConfirmRollback -FixtureMode | Out-Null
+  $interruptedRecovered = (& $manager -Operation Status -RuntimeRoot $interruptedRoot -FixtureMode) | ConvertFrom-Json
+  $interruptedRelease = Join-Path $interruptedRoot "releases\agent\$($interruptedInstalled.active_release_id)"
+  $interruptedConfig = Join-Path $interruptedRoot "config\agent\revisions\$($interruptedInstalled.active_config_id)"
+  $interruptedOwner = Get-Content -Raw -LiteralPath (Join-Path $interruptedRoot ".mg44-runtime-owner.json") | ConvertFrom-Json
+  Assert-True ($interruptedRecovered.owned -and -not $interruptedRecovered.installed -and -not $interruptedRecovered.pending_recovery) "fixture_interrupted_install_not_recovered"
+  Assert-True (-not (Test-Path -LiteralPath $interruptedRelease) -and -not (Test-Path -LiteralPath $interruptedConfig)) "fixture_interrupted_install_candidate_not_removed"
+  Assert-True (-not (Test-Path -LiteralPath (Join-Path $interruptedRoot "services\agent"))) "fixture_interrupted_install_service_boundary_not_removed"
+  Assert-True ((Test-Path -LiteralPath (Join-Path $interruptedRoot "logs\agent\preserved.log")) -and $interruptedOwner.lifecycle_state -eq "uninstalled_retryable") "fixture_interrupted_install_evidence_or_retry_state_invalid"
+  Assert-True ((Get-Sha256 $secretFile) -eq $secretSha -and (Get-Sha256 (Join-Path $stateRoot "agent-state.json")) -eq $stateSha -and (Get-Sha256 (Join-Path $stateRoot "spool\preserved.batch.json")) -eq $spoolSha) "fixture_interrupted_install_external_state_changed"
+  & $manager -Operation Install -RuntimeRoot $interruptedRoot -ArtifactPath $a.Artifact -ManifestPath $a.Manifest -EnvPath $a.Env -NodeConfigPath $a.Node -ExpectedSourceCommit $a.Commit -ExpectedArtifactSha256 $a.ArtifactSha -ConfirmInstall -FixtureMode | Out-Null
+  & $manager -Operation Uninstall -RuntimeRoot $interruptedRoot -ConfirmUninstall -FixtureMode | Out-Null
+  Assert-True (-not (Test-Path -LiteralPath $interruptedRoot)) "fixture_interrupted_install_retry_cleanup_failed"
+
   & $manager -Operation Install -RuntimeRoot $runtimeRoot -ArtifactPath $a.Artifact -ManifestPath $a.Manifest -EnvPath $a.Env -NodeConfigPath $a.Node -ExpectedSourceCommit $a.Commit -ExpectedArtifactSha256 $a.ArtifactSha -ConfirmInstall -FixtureMode | Out-Null
   $installed = (& $manager -Operation Status -RuntimeRoot $runtimeRoot -FixtureMode) | ConvertFrom-Json
   Assert-True ($installed.installed -eq $true -and $installed.active_release_id.StartsWith($a.Commit)) "fixture_install_failed"
@@ -144,6 +176,7 @@ try {
     ok = $true; install_passed = $true; upgrade_passed = $true; no_rebuild_rollback_passed = $true
     config_rollback_passed = $true; state_spool_secret_preserved = $true; failed_activation_fail_closed_passed = $true
     fresh_install_failure_cleanup_passed = $true; artifact_authorization_anchor_passed = $true
+    interrupted_first_install_recovery_passed = $true
     fixed_entrypoint_passed = $true; full_dry_run_config_validation_passed = $true; tampered_rollback_rejected = $true
     ownership_boundary_passed = $true; spool_growth_gate_passed = $true
     uninstall_passed = $true; windows_service_registered = $false; production_contact = $false; lax_runtime_touched = $false

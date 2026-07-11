@@ -271,6 +271,68 @@ function Assert-ActiveEvidence {
 }
 function Assert-NoPendingRecovery { Assert-True (-not (Test-Path -LiteralPath (Get-PendingTransactionPath))) "pending_activation_recovery_required" }
 
+function Test-PendingFirstInstallRecovery {
+  param($Record)
+  return ([string]$Record.operation -eq "Install") -and
+    (-not $Record.previous_release) -and (-not $Record.previous_config) -and
+    (-not $Record.previous_source_commit) -and (-not $Record.previous_artifact_sha256)
+}
+function Assert-PendingFirstInstallRecovery {
+  param($Record)
+  Assert-True (Test-PendingFirstInstallRecovery $Record) "first_install_recovery_record_invalid"
+  $source = [string]$Record.target_source_commit; $artifact = [string]$Record.target_artifact_sha256
+  $release = [string]$Record.target_release; $config = [string]$Record.target_config
+  Assert-True ($source -match "^[0-9a-f]{40}$" -and $artifact -match "^[0-9a-f]{64}$") "first_install_recovery_target_invalid"
+  Assert-True ($release -eq "$source-$($artifact.Substring(0, 16))") "first_install_recovery_release_invalid"
+  Assert-True ($config -match "^[0-9a-f]{64}$") "first_install_recovery_config_invalid"
+  Assert-True (($Record.PSObject.Properties.Name -contains "target_release_created") -and ($Record.target_release_created -is [bool])) "first_install_recovery_release_ownership_missing"
+  Assert-True (($Record.PSObject.Properties.Name -contains "target_config_created") -and ($Record.target_config_created -is [bool])) "first_install_recovery_config_ownership_missing"
+  Assert-True (-not (Test-Path -LiteralPath (Get-CurrentTransactionPath))) "first_install_recovery_current_transaction_unexpected"
+}
+function Remove-OwnedFirstInstallJunctions {
+  param([string]$BasePath, [string]$ExpectedTarget)
+  foreach ($path in @($BasePath, "$BasePath.next", "$BasePath.old")) {
+    $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item) { continue }
+    Assert-True ([bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) "first_install_recovery_path_not_junction"
+    Assert-True ([string]$item.Target -eq $ExpectedTarget) "first_install_recovery_junction_target_mismatch"
+    [IO.Directory]::Delete($item.FullName)
+  }
+}
+function Write-RetryableOwnerState {
+  $ownerPath = Get-OwnerPath; $owner = Get-Content -Raw -LiteralPath $ownerPath | ConvertFrom-Json
+  Write-JsonAtomic $ownerPath @{
+    schema_version = $ownerSchema; component = $component; service_name = $serviceName
+    root_fingerprint = Get-TextSha256 $root.ToLowerInvariant(); installation_id = [string]$owner.installation_id
+    lifecycle_state = "uninstalled_retryable"; updated_at = [DateTime]::UtcNow.ToString("o")
+  }
+}
+function Recover-PendingFirstInstall {
+  param($Record)
+  Assert-PendingFirstInstallRecovery $Record
+  $targetReleaseDir = Join-Path $root "releases\agent\$($Record.target_release)"
+  $targetConfigDir = Join-Path $root "config\agent\revisions\$($Record.target_config)"
+  $activeReleasePath = Join-Path $root "active\agent"; $activeConfigPath = Join-Path $root "config\agent\active"
+  $serviceExe = Join-Path $root "services\agent\agent-service.exe"
+  if (-not $FixtureMode) {
+    if (Test-Path -LiteralPath $serviceExe -PathType Leaf) {
+      try { Invoke-ServiceCommand $serviceExe "stop" } catch { }
+      try { Invoke-ServiceCommand $serviceExe "uninstall" } catch { }
+    }
+    Assert-True (@(Get-Service -Name $serviceName -ErrorAction SilentlyContinue).Count -eq 0) "first_install_service_recovery_failed"
+  }
+  Remove-OwnedFirstInstallJunctions $activeReleasePath $targetReleaseDir
+  Remove-OwnedFirstInstallJunctions $activeConfigPath $targetConfigDir
+  $serviceDir = Join-Path $root "services\agent"; if (Test-Path -LiteralPath $serviceDir) { Remove-Item -LiteralPath $serviceDir -Recurse -Force }
+  if ($Record.target_release_created -and (Test-Path -LiteralPath $targetReleaseDir)) { Remove-Item -LiteralPath $targetReleaseDir -Recurse -Force }
+  if ($Record.target_config_created -and (Test-Path -LiteralPath $targetConfigDir)) { Remove-Item -LiteralPath $targetConfigDir -Recurse -Force }
+  Remove-PendingTransaction
+  Write-RetryableOwnerState
+  Assert-True (-not (Test-Path -LiteralPath $activeReleasePath)) "first_install_release_boundary_not_removed"
+  Assert-True (-not (Test-Path -LiteralPath $activeConfigPath)) "first_install_config_boundary_not_removed"
+  Assert-True (-not (Test-Path -LiteralPath (Get-PendingTransactionPath))) "first_install_pending_journal_not_removed"
+}
+
 $root = [IO.Path]::GetFullPath($RuntimeRoot)
 Assert-True ([IO.Path]::IsPathRooted($root)) "runtime_root_must_be_absolute"
 Assert-True ($root -ne [IO.Path]::GetPathRoot($root)) "runtime_root_cannot_be_volume_root"
@@ -305,7 +367,13 @@ if ($DryRun) {
     if ($Operation -eq "Upgrade") { Assert-OwnedRuntime; Assert-NoPendingRecovery; Assert-ActiveEvidence (Get-ActiveEvidence) }
   } elseif ($Operation -eq "Rollback") {
     Assert-OwnedRuntime
-    $record = if (Test-Path -LiteralPath (Get-PendingTransactionPath)) { Read-Transaction (Get-PendingTransactionPath) } else { Read-Transaction (Get-CurrentTransactionPath) }
+    $pendingPath = Get-PendingTransactionPath; $recoveringPending = Test-Path -LiteralPath $pendingPath
+    $record = if ($recoveringPending) { Read-Transaction $pendingPath } else { Read-Transaction (Get-CurrentTransactionPath) }
+    if ($recoveringPending -and (Test-PendingFirstInstallRecovery $record)) {
+      Assert-PendingFirstInstallRecovery $record
+      [ordered]@{ ok = $true; operation = $Operation; dry_run = $true; recovery_mode = "interrupted_first_install"; mutation_performed = $false; service_registered = $false; production_contact = $false; lax_runtime_touched = $false } | ConvertTo-Json -Compress
+      return
+    }
     Assert-True ($record.previous_release -and $record.previous_config -and $record.previous_source_commit -and $record.previous_artifact_sha256) "rollback_previous_slot_missing"
     Test-InstalledSlot (Join-Path $root "releases\agent\$($record.previous_release)") (Join-Path $root "config\agent\revisions\$($record.previous_config)") ([string]$record.previous_source_commit) ([string]$record.previous_artifact_sha256) ([string]$record.previous_config)
   } else { Assert-OwnedRuntime; Assert-NoPendingRecovery }
@@ -341,6 +409,7 @@ try {
       previous_release = if ($previous) { $previous.release_id } else { $null }; previous_config = if ($previous) { $previous.config_id } else { $null }
       previous_source_commit = if ($previous) { $previous.source_commit } else { $null }; previous_artifact_sha256 = if ($previous) { $previous.artifact_sha256 } else { $null }
       target_release = $candidate.release_id; target_config = $candidate.config_id; target_source_commit = $candidate.source_commit; target_artifact_sha256 = $candidate.artifact_sha256
+      target_release_created = [bool]$candidate.created_release; target_config_created = [bool]$candidate.created_config
       maximum_spool_count = $spoolBefore
     }
     Write-PendingTransaction $pending
@@ -401,6 +470,11 @@ try {
   if ($Operation -eq "Rollback") {
     $pendingPath = Get-PendingTransactionPath; $recoveringPending = Test-Path -LiteralPath $pendingPath
     $record = if ($recoveringPending) { Read-Transaction $pendingPath } else { Read-Transaction (Get-CurrentTransactionPath) }
+    if ($recoveringPending -and (Test-PendingFirstInstallRecovery $record)) {
+      Recover-PendingFirstInstall $record
+      [ordered]@{ ok = $true; operation = "Rollback"; recovery = "interrupted_first_install_removed"; installed = $false; retryable = $true; state_preserved = $true; spool_preserved = $true; secret_file_preserved = $true; fixture_mode = [bool]$FixtureMode; lax_runtime_touched = $false } | ConvertTo-Json -Compress
+      return
+    }
     Assert-True ($record.previous_release -and $record.previous_config -and $record.previous_source_commit -and $record.previous_artifact_sha256) "rollback_previous_slot_missing"
     $target = [ordered]@{ release_id = [string]$record.previous_release; config_id = [string]$record.previous_config; source_commit = [string]$record.previous_source_commit; artifact_sha256 = [string]$record.previous_artifact_sha256 }
     $targetReleaseDir = Join-Path $root "releases\agent\$($target.release_id)"; $targetConfigDir = Join-Path $root "config\agent\revisions\$($target.config_id)"
