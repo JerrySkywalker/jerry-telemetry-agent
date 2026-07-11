@@ -1,6 +1,6 @@
 export type UsageCollectorName = "codex-backend-usage" | "codex-cli-status-fallback";
 export type LocalCollectorName = "node-info" | "node-resources" | "service-health" | "custom-json";
-export type ProbeCollectorName = "http-probe" | "tcp-probe";
+export type ProbeCollectorName = "http-probe" | "tcp-probe" | "message-gateway-readiness";
 export type ReadOnlyCollectorName = "docker-containers" | "systemd-units";
 export type ServerCollectorName = LocalCollectorName | ProbeCollectorName | ReadOnlyCollectorName;
 export type CollectorName = UsageCollectorName | "agent-health" | ServerCollectorName;
@@ -10,6 +10,7 @@ export type CollectorEventType =
   | "node.snapshot"
   | "node.resources.snapshot"
   | "service.health.snapshot"
+  | "message.gateway.readiness"
   | "docker.containers.snapshot"
   | "systemd.units.snapshot"
   | "custom.snapshot";
@@ -24,7 +25,8 @@ export interface CollectorDefinition<N extends CollectorName = CollectorName> {
     | "node-resources"
     | "service-health"
     | "http-probe"
-    | "tcp-probe"
+  | "tcp-probe"
+  | "message-gateway-readiness"
     | "docker-containers"
     | "systemd-units"
     | "custom-json";
@@ -52,6 +54,11 @@ export interface TcpProbeTarget {
   timeout_ms?: number;
 }
 
+export interface MessageGatewayReadinessTarget {
+  url: string;
+  timeout_ms?: number;
+}
+
 export interface CustomJsonFileConfig {
   name: string;
   path: string;
@@ -59,6 +66,7 @@ export interface CustomJsonFileConfig {
 
 export interface NodeCollectorConfig<N extends CollectorName = CollectorName> extends BaseCollectorConfig<N> {
   targets?: Array<HttpProbeTarget | TcpProbeTarget>;
+  target?: MessageGatewayReadinessTarget;
   allowlist?: string[];
   units?: string[];
   files?: CustomJsonFileConfig[];
@@ -120,6 +128,12 @@ export const collectorRegistry = {
     name: "tcp-probe",
     eventType: "service.health.snapshot",
     payloadKind: "tcp-probe",
+    implemented: true
+  },
+  "message-gateway-readiness": {
+    name: "message-gateway-readiness",
+    eventType: "message.gateway.readiness",
+    payloadKind: "message-gateway-readiness",
     implemented: true
   },
   "docker-containers": {
@@ -216,6 +230,9 @@ function parseCollectorConfig(value: unknown): NodeCollectorConfig {
   if (name === "tcp-probe") {
     return { ...base, name, targets: parseTcpProbeTargets(input.targets, enabled) };
   }
+  if (name === "message-gateway-readiness") {
+    return { ...base, name, target: parseMessageGatewayReadinessTarget(input.target, enabled) };
+  }
   if (name === "docker-containers") {
     return { ...base, name, allowlist: input.allowlist === undefined ? undefined : parseStringArray(input.allowlist, `${name}.allowlist`) };
   }
@@ -292,6 +309,24 @@ function parseTcpProbeTarget(value: unknown, field: string): TcpProbeTarget {
   };
 }
 
+function parseMessageGatewayReadinessTarget(value: unknown, enabled: boolean): MessageGatewayReadinessTarget | undefined {
+  if (value === undefined) {
+    if (enabled) throw new Error("message-gateway-readiness.target must be an object when enabled");
+    return undefined;
+  }
+  const input = requiredObject(value, "message-gateway-readiness.target");
+  const timeout = input.timeout_ms === undefined
+    ? undefined
+    : requiredPositiveInteger(input.timeout_ms, "message-gateway-readiness.target.timeout_ms");
+  if (timeout !== undefined && timeout > 2000) {
+    throw new Error("message-gateway-readiness.target.timeout_ms must not exceed 2000");
+  }
+  return {
+    url: requiredLoopbackHttpUrl(input.url, "message-gateway-readiness.target.url"),
+    timeout_ms: timeout
+  };
+}
+
 function parseCustomJsonFiles(value: unknown): CustomJsonFileConfig[] {
   if (!Array.isArray(value)) throw new Error("custom-json.files must be an array");
   return value.map((item, index) => {
@@ -329,6 +364,15 @@ function requiredHttpUrl(value: unknown, field: string): string {
   const url = requiredString(value, field);
   const parsed = new URL(url);
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error(`${field} must be http or https`);
+  return url;
+}
+
+function requiredLoopbackHttpUrl(value: unknown, field: string): string {
+  const url = requiredHttpUrl(value, field);
+  const parsed = new URL(url);
+  if (!['127.0.0.1', 'localhost', '[::1]', '::1'].includes(parsed.hostname)) {
+    throw new Error(`${field} must use a loopback host`);
+  }
   return url;
 }
 

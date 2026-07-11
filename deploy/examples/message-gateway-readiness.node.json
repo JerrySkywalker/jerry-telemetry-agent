@@ -1,0 +1,18 @@
+{
+  "node_id": "message-gateway-host",
+  "hostname": "message-gateway-host",
+  "region": "local",
+  "role": "message-gateway",
+  "provider": "local",
+  "collectors": [
+    {
+      "name": "message-gateway-readiness",
+      "enabled": false,
+      "interval_seconds": 60,
+      "target": {
+        "url": "http://127.0.0.1:3094/v1/telemetry/readiness",
+        "timeout_ms": 2000
+      }
+    }
+  ]
+}
