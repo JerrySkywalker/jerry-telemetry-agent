@@ -38,8 +38,38 @@ describe("Message Gateway readiness collector", () => {
     expect(JSON.stringify(result)).not.toContain("connection unavailable");
   });
 
+  it("rejects a wrong source and forwards a valid stale status without upgrading it", async () => {
+    const wrongSource = await collectMessageGatewayReadiness(
+      { url: "http://127.0.0.1:3094/v1/telemetry/readiness" }, observedAt,
+      async () => ({ ok: true, json: async () => validPayload({ source: "untrusted" }) }) as Response
+    );
+    const stale = await collectMessageGatewayReadiness(
+      { url: "http://127.0.0.1:3094/v1/telemetry/readiness" }, observedAt,
+      async () => ({ ok: true, json: async () => validPayload({ status: "stale", failure_class: "operation_stale", last_success_at: "2026-07-10T23:54:59.000Z" }) }) as Response
+    );
+    expect(wrongSource).toMatchObject({ status: "unavailable", failure_class: "invalid_contract" });
+    expect(stale).toMatchObject({ status: "stale", failure_class: "operation_stale", source: "telemetry_agent_local_probe" });
+  });
+
   it("requires a loopback target and a bounded timeout", () => {
     expect(() => parseDeclarativeNodeConfig({ collectors: [{ name: "message-gateway-readiness", enabled: true, target: { url: "http://example.test/ready" } }] })).toThrow();
     expect(() => parseDeclarativeNodeConfig({ collectors: [{ name: "message-gateway-readiness", enabled: true, target: { url: "http://127.0.0.1:3094/ready", timeout_ms: 2001 } }] })).toThrow();
   });
 });
+
+function validPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    schema_version: "jerry.message-gateway.readiness.v1",
+    service_id: "jerry-message-gateway",
+    observed_at: observedAt,
+    status: "healthy",
+    process_reachability: "reachable",
+    dependencies: { configuration: "ready", message_store: "ready", delivery_path: "ready" },
+    last_success_at: observedAt,
+    failure_class: "none",
+    source: "gateway_runtime",
+    freshness_ttl_seconds: 300,
+    version: "0.13.0",
+    ...overrides
+  };
+}

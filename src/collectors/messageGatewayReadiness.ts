@@ -54,7 +54,7 @@ export async function collectMessageGatewayReadiness(
 }
 
 function normalize(value: unknown, fallbackObservedAt: string): MessageGatewayReadinessEvidence | undefined {
-  if (!isRecord(value) || value.schema_version !== MESSAGE_GATEWAY_READINESS_SCHEMA_VERSION || value.service_id !== "jerry-message-gateway") {
+  if (!isRecord(value) || value.schema_version !== MESSAGE_GATEWAY_READINESS_SCHEMA_VERSION || value.service_id !== "jerry-message-gateway" || value.source !== "gateway_runtime") {
     return undefined;
   }
   const status = statusValue(value.status);
