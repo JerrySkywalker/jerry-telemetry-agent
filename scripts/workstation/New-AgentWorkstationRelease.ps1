@@ -158,7 +158,13 @@ try {
       fixture_runtime = $false
     } | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
-    & (Join-Path $repoRoot "scripts\workstation\Test-AgentReleaseManifest.ps1") -ArtifactPath $artifactPath -ManifestPath $manifestPath -ExpectedSourceCommit $sourceCommit | Out-Null
+    & (Join-Path $repoRoot "scripts\workstation\Test-AgentReleaseManifest.ps1") `
+      -ArtifactPath $artifactPath -ManifestPath $manifestPath `
+      -ExpectedSourceCommit $sourceCommit -ExpectedArtifactSha256 $artifactSha `
+      -ExpectedRuntimeVersion ([string]$trust.node_runtime.version) `
+      -ExpectedNodeArchiveSha256 ([string]$trust.node_runtime.sha256) `
+      -ExpectedServiceWrapperVersion ([string]$trust.service_wrapper.version) `
+      -ExpectedServiceWrapperSha256 ([string]$trust.service_wrapper.sha256) | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "release_manifest_verification_failed" }
     [ordered]@{
       ok = $true

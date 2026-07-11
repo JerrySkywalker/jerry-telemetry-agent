@@ -12,6 +12,7 @@
   <onfailure action="restart" delay="10 sec" />
   <onfailure action="restart" delay="30 sec" />
   <onfailure action="none" />
+  <logpath>__LOG_PATH__</logpath>
   <log mode="roll-by-size-time">
     <sizeThreshold>10485760</sizeThreshold>
     <pattern>yyyyMMdd</pattern>

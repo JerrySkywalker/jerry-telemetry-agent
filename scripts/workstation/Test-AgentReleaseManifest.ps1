@@ -2,7 +2,12 @@ param(
   [Parameter(Mandatory = $true)][string]$ArtifactPath,
   [Parameter(Mandatory = $true)][string]$ManifestPath,
   [string]$ExtractedRoot,
-  [string]$ExpectedSourceCommit,
+  [Parameter(Mandatory = $true)][string]$ExpectedSourceCommit,
+  [Parameter(Mandatory = $true)][string]$ExpectedArtifactSha256,
+  [string]$ExpectedRuntimeVersion,
+  [string]$ExpectedNodeArchiveSha256,
+  [string]$ExpectedServiceWrapperVersion,
+  [string]$ExpectedServiceWrapperSha256,
   [switch]$AllowFixtureRuntime
 )
 
@@ -46,7 +51,12 @@ $required = @(
   "schema_version", "component", "source_repository", "source_commit",
   "artifact_filename", "artifact_sha256", "artifact_size_bytes",
   "runtime_version", "build_tool_version", "artifact_file_list_or_digest",
-  "required_config_key_names", "default_activation_state", "build_timestamp"
+  "required_config_key_names", "default_activation_state", "build_timestamp",
+  "platform", "architecture", "entrypoint", "node_archive_sha256",
+  "service_wrapper_version", "service_wrapper_sha256", "collector_name", "event_type",
+  "loopback_required", "state_preserved_on_upgrade", "spool_preserved_on_upgrade",
+  "secret_files_preserved", "production_build_required", "production_git_required",
+  "production_npm_required", "fixture_runtime"
 )
 foreach ($name in $required) { Assert-True ($manifest.PSObject.Properties.Name -contains $name) "manifest_missing_$name" }
 
@@ -54,13 +64,34 @@ Assert-True ($manifest.schema_version -eq "jerry.workstation.release.v1") "manif
 Assert-True ($manifest.component -eq "jerry-telemetry-agent") "manifest_component_invalid"
 Assert-True ($manifest.source_repository -eq "JerrySkywalker/jerry-telemetry-agent") "manifest_repository_invalid"
 Assert-True ([string]$manifest.source_commit -match "^[0-9a-f]{40}$") "manifest_source_commit_invalid"
-if ($ExpectedSourceCommit) { Assert-True ($manifest.source_commit -eq $ExpectedSourceCommit.ToLowerInvariant()) "manifest_source_commit_mismatch" }
+Assert-True ($ExpectedSourceCommit -match "^[0-9a-fA-F]{40}$") "expected_source_commit_invalid"
+Assert-True ($manifest.source_commit -eq $ExpectedSourceCommit.ToLowerInvariant()) "manifest_source_commit_mismatch"
 Assert-True ([IO.Path]::GetFileName([string]$manifest.artifact_filename) -eq [string]$manifest.artifact_filename) "manifest_artifact_filename_invalid"
 Assert-True ([IO.Path]::GetFileName($artifact) -eq [string]$manifest.artifact_filename) "manifest_artifact_filename_mismatch"
 Assert-True ([string]$manifest.artifact_sha256 -match "^[0-9a-f]{64}$") "manifest_artifact_sha256_invalid"
+Assert-True ($ExpectedArtifactSha256 -match "^[0-9a-fA-F]{64}$") "expected_artifact_sha256_invalid"
+Assert-True ([string]$manifest.artifact_sha256 -eq $ExpectedArtifactSha256.ToLowerInvariant()) "manifest_artifact_authorization_mismatch"
 Assert-True ((Get-Sha256 $artifact) -eq [string]$manifest.artifact_sha256) "artifact_sha256_mismatch"
 Assert-True ((Get-Item -LiteralPath $artifact).Length -eq [int64]$manifest.artifact_size_bytes) "artifact_size_mismatch"
 Assert-True ([string]$manifest.runtime_version -match "^22\.[0-9]+\.[0-9]+$") "runtime_version_must_be_node_22"
+if ($ExpectedRuntimeVersion) { Assert-True ([string]$manifest.runtime_version -eq $ExpectedRuntimeVersion) "manifest_runtime_version_mismatch" }
+Assert-True ($manifest.platform -eq "win32") "manifest_platform_invalid"
+Assert-True ($manifest.architecture -eq "x64") "manifest_architecture_invalid"
+Assert-True ($manifest.entrypoint -eq "app/dist/src/server-agent-daemon.js") "manifest_entrypoint_invalid"
+Assert-True ([string]$manifest.node_archive_sha256 -match "^[0-9a-f]{64}$") "manifest_node_archive_sha256_invalid"
+Assert-True ([string]$manifest.service_wrapper_sha256 -match "^[0-9a-f]{64}$") "manifest_service_wrapper_sha256_invalid"
+if (-not $AllowFixtureRuntime) {
+  Assert-True ($ExpectedNodeArchiveSha256 -match "^[0-9a-fA-F]{64}$") "expected_node_archive_sha256_required"
+  Assert-True ($ExpectedServiceWrapperSha256 -match "^[0-9a-fA-F]{64}$") "expected_service_wrapper_sha256_required"
+  Assert-True ([string]$manifest.node_archive_sha256 -eq $ExpectedNodeArchiveSha256.ToLowerInvariant()) "manifest_node_archive_sha256_mismatch"
+  Assert-True ([string]$manifest.service_wrapper_sha256 -eq $ExpectedServiceWrapperSha256.ToLowerInvariant()) "manifest_service_wrapper_sha256_mismatch"
+  Assert-True ([string]$manifest.service_wrapper_version -eq $ExpectedServiceWrapperVersion) "manifest_service_wrapper_version_mismatch"
+}
+Assert-True ($manifest.collector_name -eq "message-gateway-readiness") "manifest_collector_invalid"
+Assert-True ($manifest.event_type -eq "message.gateway.readiness") "manifest_event_type_invalid"
+Assert-True ($manifest.loopback_required -eq $true) "manifest_loopback_required"
+Assert-True ($manifest.state_preserved_on_upgrade -eq $true -and $manifest.spool_preserved_on_upgrade -eq $true -and $manifest.secret_files_preserved -eq $true) "manifest_preservation_contract_invalid"
+Assert-True ($manifest.production_build_required -eq $false -and $manifest.production_git_required -eq $false -and $manifest.production_npm_required -eq $false) "manifest_production_tooling_must_be_false"
 Assert-True ($manifest.artifact_file_list_or_digest.algorithm -eq "sha256") "manifest_file_algorithm_invalid"
 Assert-True (@($manifest.required_config_key_names).Count -gt 0) "manifest_config_keys_missing"
 foreach ($key in @($manifest.required_config_key_names)) { Assert-True ([string]$key -match "^[A-Z][A-Z0-9_]{1,127}$") "manifest_config_key_invalid" }
@@ -80,6 +111,9 @@ foreach ($item in @($manifest.artifact_file_list_or_digest.files)) {
   $expectedFiles[$relative] = $item
 }
 Assert-True ($expectedFiles.Count -gt 0) "manifest_file_inventory_empty"
+foreach ($requiredFile in @("runtime/node.exe", "app/dist/src/server-agent-daemon.js", "bin/Start-AgentRelease.ps1", "bin/Test-AgentReleaseManifest.ps1")) {
+  Assert-True ($expectedFiles.ContainsKey($requiredFile)) "manifest_required_runtime_file_missing"
+}
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archiveFiles = @{}

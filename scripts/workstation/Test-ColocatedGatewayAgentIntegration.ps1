@@ -79,11 +79,18 @@ $gatewayRepo = (Resolve-Path -LiteralPath $GatewayRepoPath).Path
 $gatewayVerifier = Join-Path $gatewayRepo "scripts\workstation\Test-GatewayReleaseManifest.ps1"
 $agentRepo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $agentVerifier = Join-Path $agentRepo "scripts\workstation\Test-AgentReleaseManifest.ps1"
-& $gatewayVerifier -ArtifactPath $GatewayArtifactPath -ManifestPath $GatewayManifestPath | Out-Null
-& $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath | Out-Null
-
 $gatewayManifest = Get-Content -Raw -LiteralPath $GatewayManifestPath | ConvertFrom-Json
 $agentManifest = Get-Content -Raw -LiteralPath $AgentManifestPath | ConvertFrom-Json
+$gatewayTrust = Get-Content -Raw -LiteralPath (Join-Path $gatewayRepo "deploy\workstation\trusted-runtime.json") | ConvertFrom-Json
+$agentTrust = Get-Content -Raw -LiteralPath (Join-Path $agentRepo "deploy\workstation\trusted-runtime.json") | ConvertFrom-Json
+& $gatewayVerifier -ArtifactPath $GatewayArtifactPath -ManifestPath $GatewayManifestPath `
+  -ExpectedSourceCommit ([string]$gatewayManifest.source_commit) -ExpectedArtifactSha256 ([string]$gatewayManifest.artifact_sha256) `
+  -ExpectedRuntimeVersion ([string]$gatewayTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$gatewayTrust.node_runtime.sha256) `
+  -ExpectedServiceWrapperVersion ([string]$gatewayTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$gatewayTrust.service_wrapper.sha256) | Out-Null
+& $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath `
+  -ExpectedSourceCommit ([string]$agentManifest.source_commit) -ExpectedArtifactSha256 ([string]$agentManifest.artifact_sha256) `
+  -ExpectedRuntimeVersion ([string]$agentTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$agentTrust.node_runtime.sha256) `
+  -ExpectedServiceWrapperVersion ([string]$agentTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$agentTrust.service_wrapper.sha256) | Out-Null
 $root = Join-Path ([IO.Path]::GetTempPath()) ("mg44-colocated-" + [guid]::NewGuid().ToString("N"))
 $gatewayRoot = Join-Path $root "gateway-release"
 $agentRoot = Join-Path $root "agent-release"
@@ -105,8 +112,14 @@ try {
   Expand-Archive -LiteralPath $AgentArtifactPath -DestinationPath $agentRoot
   Copy-Item -LiteralPath $GatewayManifestPath -Destination (Join-Path $gatewayRoot "release-manifest.json")
   Copy-Item -LiteralPath $AgentManifestPath -Destination (Join-Path $agentRoot "release-manifest.json")
-  & $gatewayVerifier -ArtifactPath $GatewayArtifactPath -ManifestPath $GatewayManifestPath -ExtractedRoot $gatewayRoot | Out-Null
-  & $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath -ExtractedRoot $agentRoot | Out-Null
+  & $gatewayVerifier -ArtifactPath $GatewayArtifactPath -ManifestPath $GatewayManifestPath -ExtractedRoot $gatewayRoot `
+    -ExpectedSourceCommit ([string]$gatewayManifest.source_commit) -ExpectedArtifactSha256 ([string]$gatewayManifest.artifact_sha256) `
+    -ExpectedRuntimeVersion ([string]$gatewayTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$gatewayTrust.node_runtime.sha256) `
+    -ExpectedServiceWrapperVersion ([string]$gatewayTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$gatewayTrust.service_wrapper.sha256) | Out-Null
+  & $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath -ExtractedRoot $agentRoot `
+    -ExpectedSourceCommit ([string]$agentManifest.source_commit) -ExpectedArtifactSha256 ([string]$agentManifest.artifact_sha256) `
+    -ExpectedRuntimeVersion ([string]$agentTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$agentTrust.node_runtime.sha256) `
+    -ExpectedServiceWrapperVersion ([string]$agentTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$agentTrust.service_wrapper.sha256) | Out-Null
   Write-Utf8NoBom $secretPath $fixtureSecret
 
   $stage = "gateway_artifact_boot"
@@ -117,7 +130,7 @@ try {
     "JMG_SERVICE_VERSION=$($gatewayManifest.source_commit)",
     "JMG_PRODUCT_PERSISTENCE_ENABLED=false", "JMG_SQLITE_PRODUCT_STORE_ENABLED=false",
     "JMG_DELIVERY_WORKER_ENABLED=false", "JMG_DELIVERY_WORKER_AUTOSTART_ENABLED=false",
-    "JMG_REAL_SEND_ENABLED=false", "JMG_EXTERNAL_NETWORK_ENABLED=false"
+    "JMG_REAL_SEND_ENABLED=false", "JMG_EXTERNAL_NETWORK_ENABLED=false", "JMG_PRODUCER_SECRETS="
   )
   Write-Utf8NoBom $gatewayConfig ($gatewayConfigLines -join [Environment]::NewLine)
   $gatewayOut = Join-Path $logRoot "gateway.out.log"; $gatewayErr = Join-Path $logRoot "gateway.err.log"; $logs += $gatewayOut, $gatewayErr
@@ -125,7 +138,12 @@ try {
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $gatewayRoot "bin\Start-GatewayRelease.ps1"),
     "-ReleaseRoot", $gatewayRoot, "-ConfigPath", $gatewayConfig
   ) $gatewayOut $gatewayErr
-  $health = Wait-JsonEndpoint "http://127.0.0.1:$gatewayPort/healthz"
+  try { $health = Wait-JsonEndpoint "http://127.0.0.1:$gatewayPort/healthz" }
+  catch {
+    $diagnostic = Get-SafeProcessDiagnostic @($gatewayOut, $gatewayErr) $fixtureSecret $root
+    Write-Host "gateway_diagnostic=$diagnostic"
+    throw
+  }
   Assert-True ($health.ok -eq $true) "gateway_artifact_health_failed"
   $readiness = Invoke-RestMethod -Uri "http://127.0.0.1:$gatewayPort/v1/telemetry/readiness" -TimeoutSec 2
   Assert-True ($readiness.status -eq "not_configured" -and $readiness.freshness_ttl_seconds -eq 300) "gateway_safe_default_failed"
@@ -145,11 +163,11 @@ try {
   $disabledBatch = Join-Path $stateRoot "disabled.batch.safe.json"
   $disabledEnv = Join-Path $configRoot "agent-disabled.env"
   $disabledEnvLines = @(
-    "AGENT_MODE=daemon", "SERVER_DAEMON_MAX_ITERATIONS=1", "TELEMETRY_OUTPUT_MODE=file",
+    "AGENT_MODE=daemon", "SERVER_DAEMON_MAX_ITERATIONS=2", "TELEMETRY_OUTPUT_MODE=file",
     "TELEMETRY_NODE_CONFIG_PATH=$disabledNode", "TELEMETRY_NODE_SECRET_FILE=$secretPath",
     "TELEMETRY_HUB_REQUEST_TIMEOUT_MS=1000", "TELEMETRY_SERVER_BATCH_LATEST_FILE=$disabledBatch",
     "TELEMETRY_BATCH_OUTPUT_FILE=$disabledBatch", "STATE_PATH=$stateRoot\disabled-state.json",
-    "SPOOL_DIR=$stateRoot\spool", "AGENT_INTERVAL_SECONDS=1", "HEALTH_SERVER_ENABLED=true",
+    "SPOOL_DIR=$stateRoot\spool", "AGENT_INTERVAL_SECONDS=2", "HEALTH_SERVER_ENABLED=true",
     "HEALTH_HOST=127.0.0.1", "HEALTH_PORT=$agentHealthPort"
   )
   Write-Utf8NoBom $disabledEnv ($disabledEnvLines -join [Environment]::NewLine)
@@ -158,6 +176,10 @@ try {
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $agentRoot "bin\Start-AgentRelease.ps1"),
     "-ReleaseRoot", $agentRoot, "-EnvPath", $disabledEnv, "-NodeConfigPath", $disabledNode
   ) $disabledOut $disabledErr
+  $agentHealth = Wait-JsonEndpoint "http://127.0.0.1:$agentHealthPort/healthz"
+  Assert-True ($agentHealth.ok -eq $true) "agent_artifact_health_failed"
+  $agentListeners = @(Get-NetTCPConnection -State Listen -LocalPort $agentHealthPort -ErrorAction SilentlyContinue)
+  Assert-True ($agentListeners.Count -gt 0 -and @($agentListeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") }).Count -eq 0) "agent_listener_not_loopback_only"
   $disabledExit = Wait-FixtureProcess $disabledProcess
   if (-not ($disabledExit.completed -and $disabledExit.exit_code -eq 0)) {
     $exitCode = if ($disabledExit.completed) { [string]$disabledExit.exit_code } else { "still-running" }
@@ -191,8 +213,22 @@ const server = http.createServer((req, res) => {
       res.writeHead(401); res.end(); return;
     }
     const payload = JSON.parse(body);
-    const eventTypes = Array.isArray(payload.events) ? payload.events.map(item => item.event_type) : [];
-    fs.writeFileSync(accepted, JSON.stringify({ accepted: true, event_types: eventTypes }));
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    const eventTypes = events.map(item => item.event_type);
+    const readiness = events.find(item => item.event_type === "message.gateway.readiness");
+    fs.writeFileSync(accepted, JSON.stringify({
+      accepted: true,
+      event_types: eventTypes,
+      envelope_schema: readiness?.schema_version,
+      source_node: readiness?.source?.node_id,
+      source_collector: readiness?.source?.collector,
+      payload_schema: readiness?.payload?.schema_version,
+      service_id: readiness?.payload?.service_id,
+      status: readiness?.payload?.status,
+      evidence_source: readiness?.payload?.source,
+      freshness_ttl_seconds: readiness?.payload?.freshness_ttl_seconds,
+      version: readiness?.payload?.version
+    }));
     res.writeHead(202, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: true }));
   });
 });
@@ -236,6 +272,10 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
   Assert-True (Test-Path -LiteralPath $mockAccepted) "mock_hub_did_not_accept_fixture"
   $accepted = Get-Content -Raw -LiteralPath $mockAccepted | ConvertFrom-Json
   Assert-True ($accepted.accepted -eq $true -and @($accepted.event_types) -contains "message.gateway.readiness") "signed_gateway_event_missing"
+  Assert-True ($accepted.envelope_schema -eq "v1" -and $accepted.source_node -eq "fixture-workstation-node" -and $accepted.source_collector -eq "message-gateway-readiness") "gateway_event_source_contract_invalid"
+  Assert-True ($accepted.payload_schema -eq "jerry.message-gateway.readiness.v1" -and $accepted.service_id -eq "jerry-message-gateway") "gateway_readiness_schema_invalid"
+  Assert-True ($accepted.status -eq "not_configured" -and $accepted.evidence_source -eq "telemetry_agent_local_probe" -and $accepted.freshness_ttl_seconds -eq 300) "gateway_readiness_state_contract_invalid"
+  Assert-True ($accepted.version -eq [string]$gatewayManifest.source_commit) "gateway_readiness_version_contract_invalid"
   Assert-True (@(Get-ChildItem -LiteralPath (Join-Path $stateRoot "spool") -File -ErrorAction SilentlyContinue).Count -eq 0) "fixture_spool_not_empty"
 
   $stage = "listener_and_log_safety"
@@ -246,6 +286,7 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
   $result = [ordered]@{
     gateway_artifact_boot_passed = $true; agent_artifact_boot_passed = $true; loopback_only_passed = $true
     safe_defaults_passed = $true; fixture_signed_upload_passed = $true; fixture_spool_zero = $true
+    agent_health_loopback_passed = $true; complete_readiness_contract_passed = $true
     production_contact = $false; service_registered = $false; ssh_used = $false; secret_values_printed = $false
   }
 } catch {

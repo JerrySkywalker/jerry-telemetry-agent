@@ -183,7 +183,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, args = process.
 }
 
 function boundedInt(value: string | undefined, fallback: number, maximum: number): number {
-  const parsed = int(value, fallback);
+  const parsed = value === undefined ? fallback : Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) throw new Error("Value must be positive");
   if (parsed > maximum) throw new Error(`Value must not exceed ${maximum}`);
   return parsed;
 }

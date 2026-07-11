@@ -164,6 +164,7 @@ describe("usage collector config", () => {
   });
 
   it("rejects unbounded Hub upload timeouts", () => {
+    expect(() => loadConfig({ TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "0" }, [])).toThrow(/must be positive/);
     expect(() => loadConfig({ TELEMETRY_HUB_REQUEST_TIMEOUT_MS: "30001" }, [])).toThrow(/must not exceed 30000/);
   });
 

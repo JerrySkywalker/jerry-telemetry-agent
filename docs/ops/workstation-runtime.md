@@ -76,7 +76,8 @@ line values.
 - Gateway target is HTTP loopback only, redirects are manual/rejected, and the
   collector timeout is at most 2000 ms.
 - Agent health binds to loopback. A source default no longer binds broadly.
-- Hub uploads have a bounded timeout, default 5000 ms and maximum 30000 ms.
+- Hub uploads have a positive bounded timeout, default 5000 ms and maximum
+  30000 ms.
 - State/spool/latest files and secret references must be absolute and external
   to release slots.
 - Service dependency is Gateway-first for start and Agent-first for rollback.
@@ -94,24 +95,43 @@ digest-matching WinSW binary.
 pwsh -File scripts/workstation/Invoke-AgentWorkstationRuntime.ps1 `
   -Operation Install -RuntimeRoot <PROTECTED_ROOT> `
   -ArtifactPath <ARTIFACT> -ManifestPath <MANIFEST> `
+  -ExpectedSourceCommit <FULL_APPROVED_SHA> `
+  -ExpectedArtifactSha256 <APPROVED_ARTIFACT_SHA256> `
   -EnvPath <PROTECTED_ENV> -NodeConfigPath <PROTECTED_NODE_CONFIG> -DryRun
 
 # Later production goal only
 pwsh -File scripts/workstation/Invoke-AgentWorkstationRuntime.ps1 `
   -Operation Install -RuntimeRoot <PROTECTED_ROOT> `
   -ArtifactPath <ARTIFACT> -ManifestPath <MANIFEST> `
+  -ExpectedSourceCommit <FULL_APPROVED_SHA> `
+  -ExpectedArtifactSha256 <APPROVED_ARTIFACT_SHA256> `
   -EnvPath <PROTECTED_ENV> -NodeConfigPath <PROTECTED_NODE_CONFIG> `
   -ServiceWrapperPath <PINNED_WINSW> `
   -AuthorizationId <OWNER_AUTHORIZATION> -ConfirmInstall
 ```
 
-Install/upgrade verifies before and after extraction, snapshots both config
-files by their combined digest, switches same-volume junctions, starts only the
-new Agent service, and runs bounded loopback health. Failed activation restores
-the prior release/config. Rollback swaps to an already verified prior slot and
-preserves state, spool, logs, and the secret file without build or package
-installation. Uninstall removes only the service/active boundary; persistent
-evidence remains unless a separate purge is authorized.
+The expected source and artifact digests are caller-supplied authorization
+anchors; the manifest cannot authorize itself. Verification also pins the
+platform, Node archive, wrapper, fixed inventoried entrypoint, collector/event
+binding, preservation flags, and absence of production Git/npm/build.
+
+Install/upgrade verifies before and after extraction, runs complete launch and
+protected-config validation without starting Node, and snapshots both config
+files by their combined digest. A pending journal is written before service or
+junction mutation. Activation advances through stop, release switch, config
+switch, start, loopback health, and a no-spool-growth gate. Failed upgrade
+restores and revalidates the prior pair; failed fresh install removes both active
+junctions, the service boundary, and newly created candidate slots. Interrupted
+activation blocks later mutation and is recoverable through confirmed rollback.
+
+Rollback rehashes the complete prior release and exact config revision before
+switching, restores the original pair if rollback health fails, and preserves
+state, spool, logs, and the secret file without build or package installation.
+Production roots carry a component/root-bound ownership marker. Uninstall
+refuses unowned roots, removes both active junctions and the service definition,
+and preserves releases, config revisions, state, spool, secret files, and WinSW
+logs under `logs/agent`. The reviewed service template is digest-pinned and a
+caller-supplied production template is rejected.
 
 `Status` reports only source commit, artifact digest, runtime version, active
 slot IDs, and spool count. It never prints config values, endpoints, secret
@@ -119,10 +139,13 @@ paths, node identity, headers, or raw evidence.
 
 ## Local proof
 
-`npm run smoke:workstation-release` performs fixture-only dry-run, install,
-upgrade, no-rebuild rollback, config rollback, failed activation, state/spool/
-secret preservation, status, and uninstall in a random temporary root. It
-asserts no real Windows service state or LAX runtime changes.
+`npm run smoke:workstation-release` performs fixture-only authorization-anchor
+rejection, fixed-entrypoint enforcement, complete dry-run config validation,
+install, upgrade, tampered-slot rejection, no-rebuild rollback, exact config
+rollback, fresh-install cleanup, failed-upgrade restoration, ownership checks,
+spool-growth acceptance, state/spool/secret preservation, status, and uninstall
+in a random temporary root. It asserts no real Windows service state or LAX
+runtime changes.
 
 `scripts/workstation/Test-ColocatedGatewayAgentIntegration.ps1` accepts already
 verified exact-commit Gateway and Agent artifacts. It extracts them into a
@@ -130,9 +153,10 @@ random temporary root, boots Gateway and Agent from their bundled Node 22
 runtimes on dynamically allocated loopback ports, proves the collector emits
 nothing while disabled, then enables only a fixture node config and verifies a
 signed batch against a fixture-only mock Hub receiver. It asserts manifest
-identity, `not_configured` safe state, zero spool, no secret/log marker, no
-non-loopback listener, released ports, stopped processes, and removed fixture
-directories.
+identity, both listeners are loopback-only, `not_configured`, the exact envelope
+and readiness schema, specialized source/collector identity, TTL 300, exact
+Gateway version, zero spool, no secret/log marker, released ports, stopped
+processes, and removed fixture directories.
 
 MG-44P0A does not access production, use SSH, register a service, install WinSW,
 deploy a runtime, enable the collector, enable HTTP upload, read a real secret,

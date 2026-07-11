@@ -8,6 +8,11 @@
     "license": "MIT",
     "committed_binary": false
   },
+  "service_template": {
+    "name": "jerry-telemetry-agent-service.xml.template",
+    "sha256": "9065d5df7d46ca924dfeef0461894d16a212761ed65af675dfc96761e3232ddb",
+    "committed_source": true
+  },
   "node_runtime": {
     "name": "node-v22.23.1-win-x64.zip",
     "version": "22.23.1",
