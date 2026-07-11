@@ -4,8 +4,9 @@ import { collectDockerContainers } from "./docker/containers.js";
 import { collectLinuxNodeInfo } from "./linux/nodeInfo.js";
 import { collectLinuxResources } from "./linux/resources.js";
 import { collectHttpProbes } from "./probes/httpProbe.js";
+import { collectMessageGatewayReadiness } from "./messageGatewayReadiness.js";
 import { collectTcpProbes } from "./probes/tcpProbe.js";
-import { collectorEventType, type CollectorName, type DeclarativeNodeConfig, type HttpProbeTarget, type NodeCollectorConfig, type TcpProbeTarget } from "./registry.js";
+import { collectorEventType, type CollectorName, type DeclarativeNodeConfig, type HttpProbeTarget, type MessageGatewayReadinessTarget, type NodeCollectorConfig, type TcpProbeTarget } from "./registry.js";
 import { collectorErrorPayload, type ServerCollectorContext } from "./serverTypes.js";
 import { collectSystemdUnits } from "./systemd/units.js";
 import { buildTelemetryBatch, buildTelemetryEnvelope, type TelemetryBatch, type TelemetryEnvelope } from "../telemetry/envelope.js";
@@ -113,6 +114,8 @@ async function runCollector(collector: NodeCollectorConfig, context: ServerColle
       return collectHttpProbes((collector.targets ?? []) as HttpProbeTarget[], context.capturedAt);
     case "tcp-probe":
       return collectTcpProbes((collector.targets ?? []) as TcpProbeTarget[], context.capturedAt);
+    case "message-gateway-readiness":
+      return { ...await collectMessageGatewayReadiness((collector.target ?? {}) as MessageGatewayReadinessTarget, context.capturedAt) };
     case "docker-containers":
       return collectDockerContainers(collector.allowlist);
     case "systemd-units":
@@ -125,13 +128,16 @@ async function runCollector(collector: NodeCollectorConfig, context: ServerColle
 }
 
 function buildServerEvent(collector: CollectorName, context: ServerCollectorContext, payload: Record<string, unknown>): TelemetryEnvelope {
+  const source = collector === "message-gateway-readiness"
+    ? { node_id: context.nodeId, collector }
+    : {
+        node_id: context.nodeId,
+        hostname: context.hostname,
+        region: context.region,
+        collector
+      };
   return buildTelemetryEnvelope(
-    {
-      node_id: context.nodeId,
-      hostname: context.hostname,
-      region: context.region,
-      collector
-    },
+    source,
     collectorEventType(collector),
     payload,
     context.capturedAt

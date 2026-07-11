@@ -4,8 +4,8 @@ import { sanitizeSnapshotPayload } from "./sanitize.js";
 
 export interface TelemetrySource {
   node_id: string;
-  hostname: string;
-  region: string;
+  hostname?: string;
+  region?: string;
   collector: string;
 }
 
