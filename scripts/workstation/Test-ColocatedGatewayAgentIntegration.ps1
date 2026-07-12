@@ -133,10 +133,26 @@ try {
   Expand-Archive -LiteralPath $AgentArtifactPath -DestinationPath $agentRoot
   Copy-Item -LiteralPath $GatewayManifestPath -Destination (Join-Path $gatewayRoot "release-manifest.json")
   Copy-Item -LiteralPath $AgentManifestPath -Destination (Join-Path $agentRoot "release-manifest.json")
-  & $gatewayVerifier -ArtifactPath $GatewayArtifactPath -ManifestPath $GatewayManifestPath -ExtractedRoot $gatewayRoot `
-    -ExpectedSourceCommit ([string]$gatewayManifest.source_commit) -ExpectedArtifactSha256 ([string]$gatewayManifest.artifact_sha256) `
-    -ExpectedRuntimeVersion ([string]$gatewayTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$gatewayTrust.node_runtime.sha256) `
-    -ExpectedServiceWrapperVersion ([string]$gatewayTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$gatewayTrust.service_wrapper.sha256) | Out-Null
+  $gatewayVerifierArguments = @{
+    ArtifactPath = $GatewayArtifactPath; ManifestPath = $GatewayManifestPath; ExtractedRoot = $gatewayRoot
+    ExpectedSourceCommit = [string]$gatewayManifest.source_commit; ExpectedArtifactSha256 = [string]$gatewayManifest.artifact_sha256
+    ExpectedRuntimeVersion = [string]$gatewayTrust.node_runtime.version; ExpectedNodeArchiveSha256 = [string]$gatewayTrust.node_runtime.sha256
+    ExpectedServiceWrapperVersion = [string]$gatewayTrust.service_wrapper.version; ExpectedServiceWrapperSha256 = [string]$gatewayTrust.service_wrapper.sha256
+  }
+  $gatewayVerifierAnchorRejections = 0
+  try { & $gatewayVerifier @gatewayVerifierArguments | Out-Null } catch { $gatewayVerifierAnchorRejections++ }
+  foreach ($wrongAnchors in @(
+    @{ ExpectedServiceTemplateSha256 = ("f" * 64); ExpectedServiceAccountModel = [string]$gatewayTrust.service_template.service_account_model },
+    @{ ExpectedServiceTemplateSha256 = [string]$gatewayTrust.service_template.sha256; ExpectedServiceAccountModel = "UNSAFE_FIXTURE_ACCOUNT_MODEL" }
+  )) {
+    $probeArguments = $gatewayVerifierArguments.Clone()
+    foreach ($name in $wrongAnchors.Keys) { $probeArguments[$name] = $wrongAnchors[$name] }
+    try { & $gatewayVerifier @probeArguments | Out-Null } catch { $gatewayVerifierAnchorRejections++ }
+  }
+  Assert-True ($gatewayVerifierAnchorRejections -eq 3) "gateway_verifier_caller_anchor_rejection_failed"
+  $gatewayVerifierArguments["ExpectedServiceTemplateSha256"] = [string]$gatewayTrust.service_template.sha256
+  $gatewayVerifierArguments["ExpectedServiceAccountModel"] = [string]$gatewayTrust.service_template.service_account_model
+  & $gatewayVerifier @gatewayVerifierArguments | Out-Null
   & $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath -ExtractedRoot $agentRoot `
     -ExpectedSourceCommit ([string]$agentManifest.source_commit) -ExpectedArtifactSha256 ([string]$agentManifest.artifact_sha256) `
     -ExpectedRuntimeVersion ([string]$agentTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$agentTrust.node_runtime.sha256) `
@@ -320,6 +336,8 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
     safe_defaults_passed = $true; fixture_signed_upload_passed = $true; fixture_spool_zero = $true
     agent_health_loopback_passed = $true; complete_readiness_contract_passed = $true
     service_account_contract_verified = $true; secret_reference_contract_verified = $true
+    gateway_verifier_missing_anchor_rejected = $true; gateway_verifier_wrong_template_anchor_rejected = $true
+    gateway_verifier_wrong_account_anchor_rejected = $true; gateway_verifier_caller_anchors_verified = $true
     production_contact = $false; service_registered = $false; ssh_used = $false; secret_values_printed = $false; private_connection_metadata_printed = $false
   }
 } catch {
