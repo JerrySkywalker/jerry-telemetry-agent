@@ -31,7 +31,7 @@ describe("read-only collectors", () => {
     const payload = await collectDockerContainers(["unlikely-*"]);
     expect(payload).toHaveProperty("status");
     expect(JSON.stringify(payload)).not.toContain("Error:");
-  });
+  }, 15_000);
 
   it("parses systemctl show output without logs or ExecStart", () => {
     const unit = parseSystemctlShow(

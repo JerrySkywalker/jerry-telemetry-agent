@@ -14,7 +14,7 @@ try {
   npm run typecheck
   npm test
   npm run build
-  docker compose config
+  docker compose config --quiet
 
   Write-Host "Local validation completed."
 } finally {

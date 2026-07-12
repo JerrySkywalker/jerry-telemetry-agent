@@ -129,6 +129,13 @@ describe("server daemon", () => {
   it("serves safe server health and latest batch summaries", async () => {
     const { config, nodeConfig } = await fixtureConfig(["file"], { healthHost: "127.0.0.1", healthPort: 0 });
     await runServerDaemonIteration(config, nodeConfig);
+    await writeFile(config.agentHealthOutputFile, JSON.stringify({
+      observed_at: "2026-07-12T00:00:00.000Z",
+      node: { id: "private-node", hostname: "private-host" },
+      agent: { version: "fixture-version" },
+      status: { ok: false, degraded: true, message: "raw private error" },
+      outputs: { pending_spool_count: 2, last_http_error_at: "2026-07-12T00:00:00.000Z", output_file: config.serverBatchOutputFile }
+    }));
     const server = startHealthServer(config);
     await new Promise<void>((resolve) => server.once("listening", resolve));
     const address = server.address();
@@ -136,12 +143,19 @@ describe("server daemon", () => {
 
     const status = await fetchJson(`http://127.0.0.1:${address.port}/api/server/status`);
     const latest = await fetchJson(`http://127.0.0.1:${address.port}/api/server/batch/latest`);
+    const health = await fetchJson(`http://127.0.0.1:${address.port}/healthz`);
+    const agentHealth = await fetchJson(`http://127.0.0.1:${address.port}/api/agent/health/latest`);
     await closeServer(server);
 
     expect(status).toMatchObject({ daemon_mode: "server", pending_batch_spool_count: 0, last_batch_error_present: false });
     expect(latest).toMatchObject({ schema_version: "v1", payloads_included: false, forbidden_markers_found: false });
-    expect(JSON.stringify({ status, latest })).not.toContain("\"payload\":");
-    expect(findForbiddenTelemetryMarkers({ status, latest })).toEqual([]);
+    expect(agentHealth).toMatchObject({ ok: false, degraded: true, pending_spool_count: 2, last_http_error_present: true, output_allowlist_version: "jerry.agent.health.v1" });
+    const diagnosticText = JSON.stringify({ status, latest, health, agentHealth });
+    expect(diagnosticText).not.toContain("\"payload\":");
+    for (const forbidden of ["private-node", "private-host", "raw private error", config.serverBatchOutputFile, "node_id", "hostname", "last_batch_file", "last_error\""]) {
+      expect(diagnosticText).not.toContain(forbidden);
+    }
+    expect(findForbiddenTelemetryMarkers({ status, latest, health, agentHealth })).toEqual([]);
   });
 
   it("bounds health shutdown when a client leaves an incomplete request open", async () => {
@@ -194,6 +208,7 @@ async function fixtureConfig(outputModes: Config["outputModes"], overrides: Part
     collectorConfigs: nodeConfig.collectors,
     serverBatchLatestFile: path.join(dir, "server-batch-latest.safe.json"),
     serverBatchOutputFile: path.join(dir, "server-batch.safe.json"),
+    agentHealthOutputFile: path.join(dir, "agent-health-latest.safe.json"),
     statePath: path.join(dir, "state.json"),
     spoolDir: path.join(dir, "spool"),
     intervalSeconds: 1,

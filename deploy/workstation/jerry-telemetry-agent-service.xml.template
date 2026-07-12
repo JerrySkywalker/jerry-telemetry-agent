@@ -3,8 +3,13 @@
   <name>Jerry Telemetry Agent</name>
   <description>Co-located loopback Message Gateway telemetry collector.</description>
   <executable>%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe</executable>
-  <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "__ACTIVE_ROOT__\bin\Start-AgentRelease.ps1" -ReleaseRoot "__ACTIVE_ROOT__" -EnvPath "__ENV_PATH__" -NodeConfigPath "__NODE_CONFIG_PATH__"</arguments>
+  <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "__ACTIVE_ROOT__\bin\Start-AgentRelease.ps1" -ReleaseRoot "__ACTIVE_ROOT__" -EnvPath "__ENV_PATH__" -NodeConfigPath "__NODE_CONFIG_PATH__" -ExpectedServiceAccountBindingSha256 "__SERVICE_ACCOUNT_BINDING_SHA256__" -ExpectedSecretReferenceSchema "__SECRET_REFERENCE_SCHEMA__"</arguments>
   <workingdirectory>__ACTIVE_ROOT__</workingdirectory>
+  <serviceaccount>
+    <domain>NT SERVICE</domain>
+    <user>JerryTelemetryAgent</user>
+    <allowservicelogon>false</allowservicelogon>
+  </serviceaccount>
   <startmode>Automatic</startmode>
   <delayedAutoStart>true</delayedAutoStart>
   <depend>JerryMessageGateway</depend>
