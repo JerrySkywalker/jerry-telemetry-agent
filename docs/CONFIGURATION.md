@@ -174,7 +174,12 @@ npm run server:daemon -- --config .\deploy\examples\general-linux-agent.node.jso
 
 HTTP batch daemon mode uses `TELEMETRY_OUTPUT_MODE=file,http`, `TELEMETRY_HUB_URL` ending in `/v1/events` or explicit `TELEMETRY_HUB_BATCH_URL`, and `TELEMETRY_NODE_SECRET` supplied outside git. The daemon retries sanitized batch spool files before uploading a newly collected batch.
 
-Safe daemon state fields include batch timestamps, event types, event count, latest batch file path, upload success/error timestamps, pending spool counts, daemon mode, node id, hostname, and collector names. State does not include secrets, raw event payloads, response bodies, logs, or environment values. The daemon `--status` CLI prints only booleans, counts, and timestamps; use localhost-only `/api/server/status` for the richer safe summary.
+Safe persisted daemon state can include batch timestamps, event types, counts,
+and internal file or node bookkeeping. Local health/status HTTP DTOs never expose
+node ID, hostname, filesystem paths, or raw error text: they return only
+allowlisted booleans, counts, timestamps, versions, and collector categories.
+State does not include secrets, raw event payloads, response bodies, logs, or
+environment values.
 
 Batch spool limits are controlled by `SPOOL_MAX_FILES` and `SPOOL_MAX_BYTES`. When exceeded, the daemon drops oldest batch spool files and records a safe status; it never stores headers, signatures, secrets, or raw responses in spool files.
 

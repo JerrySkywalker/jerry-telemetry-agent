@@ -41,7 +41,13 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $trust = Get-Content -Raw -LiteralPath (Join-Path $repoRoot "deploy\workstation\trusted-runtime.json") | ConvertFrom-Json
 $nodeArchive = (Resolve-Path -LiteralPath $NodeArchivePath).Path
 $nodeArchiveSha = Get-Sha256 $nodeArchive
+Assert-True ((Split-Path -Leaf $nodeArchive) -ceq [string]$trust.node_runtime.name) "node_archive_filename_mismatch"
+$nodeSource = [Uri][string]$trust.node_runtime.url
+Assert-True ($nodeSource.Scheme -eq "https" -and $nodeSource.Host -eq "nodejs.org" -and $nodeSource.AbsolutePath -eq "/dist/v22.23.1/node-v22.23.1-win-x64.zip") "node_archive_source_trust_invalid"
 Assert-True ($nodeArchiveSha -eq [string]$trust.node_runtime.sha256) "node_archive_sha256_mismatch"
+$templatePath = Join-Path $repoRoot "deploy\workstation\jerry-telemetry-agent-service.xml.template"
+Assert-True (-not ([IO.File]::ReadAllText($templatePath).Contains("`r"))) "service_template_must_be_canonical_lf"
+Assert-True ((Get-Sha256 $templatePath) -eq [string]$trust.service_template.sha256) "service_template_raw_sha256_mismatch"
 
 Push-Location $repoRoot
 try {
@@ -146,6 +152,23 @@ try {
       node_archive_sha256 = $nodeArchiveSha
       service_wrapper_version = [string]$trust.service_wrapper.version
       service_wrapper_sha256 = [string]$trust.service_wrapper.sha256
+      service_template_byte_contract = [string]$trust.service_template.byte_contract
+      service_template_sha256 = [string]$trust.service_template.sha256
+      service_account_contract = [ordered]@{
+        schema_version = [string]$trust.service_account.schema_version
+        model = [string]$trust.service_account.model
+        identity_kind = [string]$trust.service_account.identity_kind
+        binding_sha256 = [string]$trust.service_account.binding_sha256
+        password_required = $false
+        service_logon_right_mutation = $false
+      }
+      secret_reference_contract = [ordered]@{
+        schema_version = [string]$trust.secret_reference.schema_version
+        external_file_required = $true
+        direct_secret_forbidden = $true
+        validation_reads_value = $false
+        service_access = "read_only"
+      }
       collector_name = "message-gateway-readiness"
       event_type = "message.gateway.readiness"
       loopback_required = $true
@@ -164,7 +187,10 @@ try {
       -ExpectedRuntimeVersion ([string]$trust.node_runtime.version) `
       -ExpectedNodeArchiveSha256 ([string]$trust.node_runtime.sha256) `
       -ExpectedServiceWrapperVersion ([string]$trust.service_wrapper.version) `
-      -ExpectedServiceWrapperSha256 ([string]$trust.service_wrapper.sha256) | Out-Null
+      -ExpectedServiceWrapperSha256 ([string]$trust.service_wrapper.sha256) `
+      -ExpectedServiceTemplateSha256 ([string]$trust.service_template.sha256) `
+      -ExpectedServiceAccountBindingSha256 ([string]$trust.service_account.binding_sha256) `
+      -ExpectedSecretReferenceSchema ([string]$trust.secret_reference.schema_version) | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "release_manifest_verification_failed" }
     [ordered]@{
       ok = $true

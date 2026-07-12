@@ -97,9 +97,7 @@ function Get-SafeProcessDiagnostic {
   $text = ($Paths | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { Get-Content -Raw -LiteralPath $_ }) -join [Environment]::NewLine
   Assert-True (-not $text.Contains($FixtureSecret)) "fixture_secret_leaked_to_log"
   Assert-True (-not ($text -match "(?i)-----BEGIN .*PRIVATE KEY-----|Bearer\s+|gh[pousr]_|sk-[A-Za-z0-9]{10,}")) "secret_like_marker_in_log"
-  $safe = $text.Replace($FixtureRoot, "<fixture-root>").Replace("`r", " ").Replace("`n", " ").Trim()
-  if ($safe.Length -gt 600) { $safe = $safe.Substring(0, 600) }
-  return $safe
+  return "process_output_present=$([bool]$text);output_character_count=$($text.Length);secret_marker=false;private_connection_metadata_printed=false"
 }
 function Write-Utf8NoBom {
   param([string]$Path, [string]$Text)
@@ -142,7 +140,10 @@ try {
   & $agentVerifier -ArtifactPath $AgentArtifactPath -ManifestPath $AgentManifestPath -ExtractedRoot $agentRoot `
     -ExpectedSourceCommit ([string]$agentManifest.source_commit) -ExpectedArtifactSha256 ([string]$agentManifest.artifact_sha256) `
     -ExpectedRuntimeVersion ([string]$agentTrust.node_runtime.version) -ExpectedNodeArchiveSha256 ([string]$agentTrust.node_runtime.sha256) `
-    -ExpectedServiceWrapperVersion ([string]$agentTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$agentTrust.service_wrapper.sha256) | Out-Null
+    -ExpectedServiceWrapperVersion ([string]$agentTrust.service_wrapper.version) -ExpectedServiceWrapperSha256 ([string]$agentTrust.service_wrapper.sha256) `
+    -ExpectedServiceTemplateSha256 ([string]$agentTrust.service_template.sha256) `
+    -ExpectedServiceAccountBindingSha256 ([string]$agentTrust.service_account.binding_sha256) `
+    -ExpectedSecretReferenceSchema ([string]$agentTrust.secret_reference.schema_version) | Out-Null
   Write-Utf8NoBom $secretPath $fixtureSecret
 
   $stage = "gateway_artifact_boot"
@@ -198,7 +199,9 @@ try {
   $disabledOut = Join-Path $logRoot "agent-disabled.out.log"; $disabledErr = Join-Path $logRoot "agent-disabled.err.log"; $logs += $disabledOut, $disabledErr
   $disabledProcess = Start-FixturePowerShell @(
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $agentRoot "bin\Start-AgentRelease.ps1"),
-    "-ReleaseRoot", $agentRoot, "-EnvPath", $disabledEnv, "-NodeConfigPath", $disabledNode
+    "-ReleaseRoot", $agentRoot, "-EnvPath", $disabledEnv, "-NodeConfigPath", $disabledNode,
+    "-ExpectedServiceAccountBindingSha256", ([string]$agentTrust.service_account.binding_sha256),
+    "-ExpectedSecretReferenceSchema", ([string]$agentTrust.secret_reference.schema_version)
   ) $disabledOut $disabledErr
   Wait-FixtureLoopbackListener $disabledProcess $agentHealthPort "agent_listener_not_loopback_only"
   try { $agentHealth = Wait-JsonEndpoint "http://127.0.0.1:$agentHealthPort/healthz" }
@@ -287,7 +290,9 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
   $enabledOut = Join-Path $logRoot "agent-enabled.out.log"; $enabledErr = Join-Path $logRoot "agent-enabled.err.log"; $logs += $enabledOut, $enabledErr
   $enabledProcess = Start-FixturePowerShell @(
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $agentRoot "bin\Start-AgentRelease.ps1"),
-    "-ReleaseRoot", $agentRoot, "-EnvPath", $enabledEnv, "-NodeConfigPath", $enabledNode
+    "-ReleaseRoot", $agentRoot, "-EnvPath", $enabledEnv, "-NodeConfigPath", $enabledNode,
+    "-ExpectedServiceAccountBindingSha256", ([string]$agentTrust.service_account.binding_sha256),
+    "-ExpectedSecretReferenceSchema", ([string]$agentTrust.secret_reference.schema_version)
   ) $enabledOut $enabledErr
   $enabledExit = Wait-FixtureProcess $enabledProcess
   if (-not ($enabledExit.completed -and $enabledExit.exit_code -eq 0)) {
@@ -314,7 +319,8 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
     gateway_artifact_boot_passed = $true; agent_artifact_boot_passed = $true; loopback_only_passed = $true
     safe_defaults_passed = $true; fixture_signed_upload_passed = $true; fixture_spool_zero = $true
     agent_health_loopback_passed = $true; complete_readiness_contract_passed = $true
-    production_contact = $false; service_registered = $false; ssh_used = $false; secret_values_printed = $false
+    service_account_contract_verified = $true; secret_reference_contract_verified = $true
+    production_contact = $false; service_registered = $false; ssh_used = $false; secret_values_printed = $false; private_connection_metadata_printed = $false
   }
 } catch {
   $failure = $_
@@ -341,8 +347,8 @@ server.listen(port, "127.0.0.1", () => fs.writeFileSync(ready, "ready"));
 
 if ($failure) {
   Write-Host "colocated_rehearsal_failed_stage=$stage"
-  Write-Host "colocated_rehearsal_error=$($failure.Exception.Message)"
-  throw $failure.Exception
+  Write-Host "colocated_rehearsal_error=classified_failure"
+  throw "colocated_rehearsal_failed"
 }
 $result["cleanup_passed"] = $true
 $result | ConvertTo-Json -Compress

@@ -8,6 +8,9 @@ param(
   [string]$ExpectedNodeArchiveSha256,
   [string]$ExpectedServiceWrapperVersion,
   [string]$ExpectedServiceWrapperSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedServiceTemplateSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedServiceAccountBindingSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedSecretReferenceSchema,
   [switch]$AllowFixtureRuntime
 )
 
@@ -54,6 +57,7 @@ $required = @(
   "required_config_key_names", "default_activation_state", "build_timestamp",
   "platform", "architecture", "entrypoint", "node_archive_sha256",
   "service_wrapper_version", "service_wrapper_sha256", "collector_name", "event_type",
+  "service_template_byte_contract", "service_template_sha256", "service_account_contract", "secret_reference_contract",
   "loopback_required", "state_preserved_on_upgrade", "spool_preserved_on_upgrade",
   "secret_files_preserved", "production_build_required", "production_git_required",
   "production_npm_required", "fixture_runtime"
@@ -80,6 +84,14 @@ Assert-True ($manifest.architecture -eq "x64") "manifest_architecture_invalid"
 Assert-True ($manifest.entrypoint -eq "app/dist/src/server-agent-daemon.js") "manifest_entrypoint_invalid"
 Assert-True ([string]$manifest.node_archive_sha256 -match "^[0-9a-f]{64}$") "manifest_node_archive_sha256_invalid"
 Assert-True ([string]$manifest.service_wrapper_sha256 -match "^[0-9a-f]{64}$") "manifest_service_wrapper_sha256_invalid"
+Assert-True ($ExpectedServiceTemplateSha256 -match "^[0-9a-fA-F]{64}$") "expected_service_template_sha256_invalid"
+Assert-True ($ExpectedServiceAccountBindingSha256 -match "^[0-9a-fA-F]{64}$") "expected_service_account_binding_sha256_invalid"
+Assert-True ([string]$manifest.service_template_byte_contract -eq "canonical_lf_bytes_raw_sha256") "manifest_service_template_byte_contract_invalid"
+Assert-True ([string]$manifest.service_template_sha256 -eq $ExpectedServiceTemplateSha256.ToLowerInvariant()) "manifest_service_template_authorization_mismatch"
+Assert-True ([string]$manifest.service_account_contract.binding_sha256 -eq $ExpectedServiceAccountBindingSha256.ToLowerInvariant()) "manifest_service_account_authorization_mismatch"
+Assert-True ($manifest.service_account_contract.model -eq "VirtualServiceAccount" -and $manifest.service_account_contract.identity_kind -eq "service_name_derived" -and $manifest.service_account_contract.password_required -eq $false -and $manifest.service_account_contract.service_logon_right_mutation -eq $false) "manifest_service_account_contract_invalid"
+Assert-True ([string]$manifest.secret_reference_contract.schema_version -eq $ExpectedSecretReferenceSchema) "manifest_secret_reference_authorization_mismatch"
+Assert-True ($manifest.secret_reference_contract.external_file_required -eq $true -and $manifest.secret_reference_contract.direct_secret_forbidden -eq $true -and $manifest.secret_reference_contract.validation_reads_value -eq $false -and $manifest.secret_reference_contract.service_access -eq "read_only") "manifest_secret_reference_contract_invalid"
 if (-not $AllowFixtureRuntime) {
   Assert-True ($ExpectedNodeArchiveSha256 -match "^[0-9a-fA-F]{64}$") "expected_node_archive_sha256_required"
   Assert-True ($ExpectedServiceWrapperSha256 -match "^[0-9a-fA-F]{64}$") "expected_service_wrapper_sha256_required"
@@ -156,5 +168,9 @@ if ($ExtractedRoot) {
   artifact_sha256 = [string]$manifest.artifact_sha256
   runtime_version = [string]$manifest.runtime_version
   file_count = $expectedFiles.Count
+  template_contract_verified = $true
+  service_account_contract_verified = $true
+  secret_reference_contract_verified = $true
   secret_values_printed = $false
+  private_connection_metadata_printed = $false
 } | ConvertTo-Json -Compress

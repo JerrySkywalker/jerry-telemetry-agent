@@ -17,6 +17,36 @@ identity value, or machine path. `deploy/workstation/trusted-runtime.json` pins
 WinSW x64 `2.12.0` (MIT) and Node `22.23.1` Windows x64 by exact SHA-256.
 Digest, provenance, license, version, or architecture mismatch fails closed.
 
+The WinSW XML template is a canonical LF byte sequence. Its SHA-256 is over
+those raw committed bytes; checkout conversion, CRLF normalization, parsed XML,
+or a manifest-provided digest cannot authorize it. `.gitattributes` enforces LF
+for workstation XML templates and the lifecycle manager independently rejects
+any carriage return before comparing the caller-reviewed trust digest.
+
+## Service account and identity contract
+
+The only supported service account model is `VirtualServiceAccount`, bound
+deterministically to `NT SERVICE\JerryTelemetryAgent`. The WinSW template uses
+the `NT SERVICE` domain and service-name-derived user, contains no password, and
+sets `allowservicelogon=false`; the lifecycle surface neither prompts for a
+credential nor grants Service Logon Right. `LocalSystem`, administrator,
+network-service, arbitrary existing-account, credential-bearing, and XML
+injection inputs fail closed. The account model and a safe binding digest are
+recorded in the owner and transaction journals and revalidated on upgrade,
+rollback, status, and uninstall.
+
+The owner-selected Agent identity remains configuration, not service-account
+state. `node_id` and `TELEMETRY_NODE_KEY_ID` are validated as bounded identifiers
+with all LAX markers rejected. A journaled identity-binding digest covers those
+two non-secret identifiers plus the external secret-reference binding; it never
+contains, reads, or hashes signing material. Status returns only that digest.
+
+Before mutation, the caller independently generates and supplies three
+authorization anchors with `Get-AgentWorkstationBindingAnchors.ps1`: combined
+config, Agent identity, and external secret-reference bindings. The manager
+recalculates them, journals approved and observed values separately, and
+rechecks equality during upgrade and rollback.
+
 ## Artifact
 
 `scripts/workstation/New-AgentWorkstationRelease.ps1` requires a clean exact
@@ -68,6 +98,48 @@ the secret file for diagnosis. Runtime rejects a simultaneous direct secret and
 secret-file reference, remote/relative secret paths, missing files, and multi-
 line values.
 
+The workstation manager and `Start-AgentRelease.ps1 -ValidateOnly` inspect only
+the signing-file reference and filesystem metadata. They never open or hash the
+referenced file. Outside fixture mode, manager validation requires an explicit
+allow/read rule for the fixed virtual account and rejects write, modify, or full
+control for that identity. ACL creation remains a separately authorized
+installation prerequisite; this repository does not change ACLs.
+
+The access proof uses a canonical principal allowlist rather than inferred token
+membership. Only the exact service SID may supply resource rights. `ALL
+SERVICES` is explicitly evaluated for deny precedence and may supply traversal
+on ancestors, but it cannot authorize resource writes. SYSTEM and built-in
+Administrators remain management principals; grants to every other principal
+fail the protected-resource contract.
+Release, wrapper, config, and secret resources require read/traverse and reject
+write, modify, delete, ACL, or ownership grants. State and output roots allow
+create/write without delete. Exact spool and log roots additionally allow child
+rename/delete for drain, quarantine, retention, and log rotation, while still
+rejecting root delete, ACL, and ownership rights. Every ancestor and protected
+sibling remains nonwritable. Every path component and final object must be local
+and free of reparse
+points, symbolic links, junctions, hardlinks, device/UNC forms, and lexical
+traversal. Signing references inside release, config, state, spool, or log
+boundaries fail closed.
+
+Mutable-root service ACEs must carry both container-inherit and object-inherit
+flags. Validation recursively inspects every existing mutable descendant using
+the nearest state/output, spool, or log policy, including inherited deny and
+excess-right rejection. Protected siblings are recursively inspected as well;
+a safe root cannot hide an independently writable descendant. Fixture ACL
+records model inherited child ACEs explicitly. The separate create, quarantine,
+unlink, retention, and rotation file-operation rehearsal validates API behavior
+only and is not represented as virtual-account ACL evidence.
+
+The owned runtime root is also fail-closed. The lifecycle proof recursively
+classifies the owner marker, lock, exact transaction journals, release slots,
+config revisions, service-wrapper boundary and leftovers, and mutable data
+subtrees. Management metadata is nonwritable to the service identity. Only the
+two exact active junctions are exempt from ordinary no-reparse inspection, and
+their targets must remain inside the already validated release or config-slot
+boundary. Any unclassified runtime-root descendant is rejected; a broad
+runtime-root or arbitrary-subtree exemption is not permitted.
+
 ## Safe defaults
 
 - `message-gateway-readiness` exists exactly once and starts `enabled=false`.
@@ -97,6 +169,12 @@ pwsh -File scripts/workstation/Invoke-AgentWorkstationRuntime.ps1 `
   -ArtifactPath <ARTIFACT> -ManifestPath <MANIFEST> `
   -ExpectedSourceCommit <FULL_APPROVED_SHA> `
   -ExpectedArtifactSha256 <APPROVED_ARTIFACT_SHA256> `
+  -ExpectedServiceTemplateSha256 <APPROVED_RAW_TEMPLATE_SHA256> `
+  -ExpectedServiceAccountBindingSha256 <APPROVED_ACCOUNT_BINDING_SHA256> `
+  -ExpectedSecretReferenceSchema jerry.workstation.secret-reference.v1 `
+  -ExpectedAgentIdentityBindingSha256 <APPROVED_AGENT_IDENTITY_BINDING> `
+  -ExpectedConfigBindingSha256 <APPROVED_CONFIG_BINDING> `
+  -ExpectedSecretReferenceBindingSha256 <APPROVED_SECRET_REFERENCE_BINDING> `
   -EnvPath <PROTECTED_ENV> -NodeConfigPath <PROTECTED_NODE_CONFIG> -DryRun
 
 # Later production goal only
@@ -105,8 +183,16 @@ pwsh -File scripts/workstation/Invoke-AgentWorkstationRuntime.ps1 `
   -ArtifactPath <ARTIFACT> -ManifestPath <MANIFEST> `
   -ExpectedSourceCommit <FULL_APPROVED_SHA> `
   -ExpectedArtifactSha256 <APPROVED_ARTIFACT_SHA256> `
+  -ExpectedServiceTemplateSha256 <APPROVED_RAW_TEMPLATE_SHA256> `
+  -ExpectedServiceAccountBindingSha256 <APPROVED_ACCOUNT_BINDING_SHA256> `
+  -ExpectedSecretReferenceSchema jerry.workstation.secret-reference.v1 `
+  -ExpectedAgentIdentityBindingSha256 <APPROVED_AGENT_IDENTITY_BINDING> `
+  -ExpectedConfigBindingSha256 <APPROVED_CONFIG_BINDING> `
+  -ExpectedSecretReferenceBindingSha256 <APPROVED_SECRET_REFERENCE_BINDING> `
   -EnvPath <PROTECTED_ENV> -NodeConfigPath <PROTECTED_NODE_CONFIG> `
   -ServiceWrapperPath <PINNED_WINSW> `
+  -ServiceAccountModel VirtualServiceAccount `
+  -ServiceAccountIdentity 'NT SERVICE\JerryTelemetryAgent' `
   -AuthorizationId <OWNER_AUTHORIZATION> -ConfirmInstall
 ```
 
@@ -138,9 +224,14 @@ and preserves releases, config revisions, state, spool, secret files, and WinSW
 logs under `logs/agent`. The reviewed service template is digest-pinned and a
 caller-supplied production template is rejected.
 
+After install and before later mutation, the manager reads only structured SCM
+`StartName` and requires the fixed virtual account. Status exposes only the
+verification boolean, never the SCM account value.
+
 `Status` reports only source commit, artifact digest, runtime version, active
-slot IDs, and spool count. It never prints config values, endpoints, secret
-paths, node identity, headers, or raw evidence.
+slot IDs, spool count, account model/binding digest, Agent identity-binding
+digest, and fixed safety booleans. It never prints account identity, config
+values, endpoints, ports, secret paths, node identity, headers, or raw evidence.
 
 ## Local proof
 

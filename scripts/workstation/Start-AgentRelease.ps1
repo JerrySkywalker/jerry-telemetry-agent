@@ -2,6 +2,8 @@ param(
   [Parameter(Mandatory = $true)][string]$ReleaseRoot,
   [Parameter(Mandatory = $true)][string]$EnvPath,
   [Parameter(Mandatory = $true)][string]$NodeConfigPath,
+  [Parameter(Mandatory = $true)][string]$ExpectedServiceAccountBindingSha256,
+  [Parameter(Mandatory = $true)][string]$ExpectedSecretReferenceSchema,
   [switch]$ValidateOnly,
   [switch]$AllowFixtureRuntime,
   [switch]$RequireSafeDefaults
@@ -43,15 +45,33 @@ function Assert-OutsideRelease {
   $release = [IO.Path]::GetFullPath($Root).TrimEnd("\") + "\"
   Assert-True (-not $full.StartsWith($release, [StringComparison]::OrdinalIgnoreCase)) $Code
 }
+function Assert-PlainLocalPath {
+  param([string]$Path, [ValidateSet("Leaf", "Container")][string]$Type, [string]$Code)
+  Assert-True ([IO.Path]::IsPathRooted($Path) -and -not ($Path -match "^(?i)\\\\|\\\\\?\\|\\\\\.\\|[a-z][a-z0-9+.-]*://")) $Code
+  Assert-True (-not (@($Path -split "[\\/]" | Where-Object { $_ -eq ".." }).Count)) $Code
+  $full = [IO.Path]::GetFullPath($Path); Assert-True (Test-Path -LiteralPath $full -PathType $Type) $Code
+  $rootPath = [IO.Path]::GetPathRoot($full); $cursor = $rootPath
+  foreach ($segment in @($full.Substring($rootPath.Length) -split "[\\/]" | Where-Object { $_ })) {
+    $cursor = Join-Path $cursor $segment; $item = Get-Item -LiteralPath $cursor -Force
+    Assert-True (-not [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) $Code
+    if ($item.PSObject.Properties.Name -contains "LinkType") { Assert-True ([string]$item.LinkType -notin @("SymbolicLink", "Junction", "HardLink")) $Code }
+  }
+  return $full
+}
 
-$root = (Resolve-Path -LiteralPath $ReleaseRoot).Path
-$envFile = (Resolve-Path -LiteralPath $EnvPath).Path
-$nodeConfigFile = (Resolve-Path -LiteralPath $NodeConfigPath).Path
+$root = Assert-PlainLocalPath $ReleaseRoot "Container" "release_root_alias_forbidden"
+$envFile = Assert-PlainLocalPath $EnvPath "Leaf" "runtime_env_alias_forbidden"
+$nodeConfigFile = Assert-PlainLocalPath $NodeConfigPath "Leaf" "runtime_node_config_alias_forbidden"
 $manifestPath = Join-Path $root "release-manifest.json"
 Assert-True (Test-Path -LiteralPath $manifestPath) "release_manifest_missing"
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 Assert-True ($manifest.schema_version -eq "jerry.workstation.release.v1") "release_manifest_schema_invalid"
 Assert-True ($manifest.component -eq "jerry-telemetry-agent") "release_manifest_component_invalid"
+Assert-True ($ExpectedServiceAccountBindingSha256 -match "^[0-9a-fA-F]{64}$") "expected_service_account_binding_invalid"
+Assert-True ([string]$manifest.service_account_contract.binding_sha256 -eq $ExpectedServiceAccountBindingSha256.ToLowerInvariant()) "service_account_binding_authorization_mismatch"
+Assert-True ([string]$manifest.secret_reference_contract.schema_version -eq $ExpectedSecretReferenceSchema) "secret_reference_contract_authorization_mismatch"
+Assert-True ($manifest.service_account_contract.model -eq "VirtualServiceAccount" -and $manifest.service_account_contract.identity_kind -eq "service_name_derived" -and $manifest.service_account_contract.password_required -eq $false) "service_account_contract_invalid"
+Assert-True ($manifest.secret_reference_contract.external_file_required -eq $true -and $manifest.secret_reference_contract.direct_secret_forbidden -eq $true -and $manifest.secret_reference_contract.validation_reads_value -eq $false -and $manifest.secret_reference_contract.service_access -eq "read_only") "secret_reference_contract_invalid"
 $fixtureRuntime = $manifest.fixture_runtime -eq $true
 Assert-True (-not $fixtureRuntime -or ($ValidateOnly -and $AllowFixtureRuntime)) "fixture_release_cannot_start_as_service"
 Assert-True ($manifest.platform -eq "win32" -and $manifest.architecture -eq "x64") "release_platform_invalid"
@@ -95,10 +115,11 @@ Assert-True ($values.ContainsKey("HEALTH_PORT") -and [string]$values["HEALTH_POR
 Assert-True ($values.ContainsKey("HEALTH_SERVER_ENABLED") -and [string]$values["HEALTH_SERVER_ENABLED"] -eq "true") "runtime_health_server_required"
 Assert-True ($values.ContainsKey("TELEMETRY_HUB_REQUEST_TIMEOUT_MS") -and [int]$values["TELEMETRY_HUB_REQUEST_TIMEOUT_MS"] -ge 1 -and [int]$values["TELEMETRY_HUB_REQUEST_TIMEOUT_MS"] -le 30000) "runtime_upload_timeout_invalid"
 Assert-True ($values.ContainsKey("TELEMETRY_NODE_SECRET_FILE")) "runtime_secret_file_reference_missing"
+Assert-True (-not $values.ContainsKey("TELEMETRY_NODE_SECRET")) "runtime_direct_secret_forbidden"
+Assert-True ($values.ContainsKey("TELEMETRY_NODE_KEY_ID") -and [string]$values["TELEMETRY_NODE_KEY_ID"] -match "^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$") "runtime_signing_key_identity_invalid"
+Assert-True (-not ([string]$values["TELEMETRY_NODE_KEY_ID"] -match "(?i)lax")) "runtime_signing_key_lax_marker_forbidden"
 Assert-OutsideRelease ([string]$values["TELEMETRY_NODE_SECRET_FILE"]) $root "runtime_secret_file_must_be_external_absolute"
-Assert-True (Test-Path -LiteralPath ([string]$values["TELEMETRY_NODE_SECRET_FILE"]) -PathType Leaf) "runtime_secret_file_missing"
-$secretLines = @(Get-Content -LiteralPath ([string]$values["TELEMETRY_NODE_SECRET_FILE"]) | Where-Object { $_.Trim() })
-Assert-True ($secretLines.Count -eq 1) "runtime_secret_file_must_contain_one_line"
+Assert-PlainLocalPath ([string]$values["TELEMETRY_NODE_SECRET_FILE"]) "Leaf" "runtime_secret_file_alias_forbidden" | Out-Null
 foreach ($name in @("STATE_PATH", "SPOOL_DIR", "TELEMETRY_SERVER_BATCH_LATEST_FILE", "TELEMETRY_BATCH_OUTPUT_FILE")) {
   Assert-True ($values.ContainsKey($name)) "runtime_state_path_missing"
   Assert-OutsideRelease ([string]$values[$name]) $root "runtime_state_path_must_be_external_absolute"
@@ -106,6 +127,7 @@ foreach ($name in @("STATE_PATH", "SPOOL_DIR", "TELEMETRY_SERVER_BATCH_LATEST_FI
 
 $nodeConfig = Get-Content -Raw -LiteralPath $nodeConfigFile | ConvertFrom-Json
 Assert-True ([string]$nodeConfig.node_id -and [string]$nodeConfig.node_id -ne "us-lax-pro-01") "runtime_node_identity_must_not_reuse_lax"
+Assert-True (-not ([string]$nodeConfig.node_id -match "(?i)lax")) "runtime_node_identity_lax_marker_forbidden"
 Assert-True ($nodeConfig.role -eq "message-gateway" -and $nodeConfig.provider -eq "local") "runtime_node_role_invalid"
 $collector = @($nodeConfig.collectors | Where-Object { $_.name -eq "message-gateway-readiness" })
 Assert-True ($collector.Count -eq 1) "runtime_gateway_collector_missing_or_duplicate"
@@ -120,7 +142,7 @@ if ($ValidateOnly) {
   [ordered]@{
     ok = $true; component = "jerry-telemetry-agent"; source_commit = [string]$manifest.source_commit
     config_valid = $true; loopback_only = $true; collector_default_disabled = $true
-    secret_reference_valid = $true; secret_values_printed = $false
+    secret_reference_valid = $true; secret_reference_value_accessed = $false; secret_values_printed = $false
   } | ConvertTo-Json -Compress
   return
 }

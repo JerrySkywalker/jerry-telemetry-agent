@@ -43,7 +43,7 @@ try {
   # npm test
   # npm run build
   Run-Step "npm run ci:local" { npm run ci:local }
-  Run-Step "docker compose config" { docker compose config }
+  Run-Step "docker compose config (quiet)" { docker compose config --quiet }
   Run-Step "scan-secrets-light" { & "$PSScriptRoot\scan-secrets-light.ps1" }
   Run-Step "git diff --check" { git diff --check }
   Run-Step "validate-local.ps1" { & "$PSScriptRoot\validate-local.ps1" }

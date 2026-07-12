@@ -29,17 +29,17 @@ export function startHealthServer(config: Config): http.Server {
     const state = await readState(config.statePath);
     if (req.url === "/api/codex/usage/latest") {
       const latest = await readSnapshot(config.usageLatestPath);
-      writeJson(res, latest ?? { error: "not_found" }, latest ? 200 : 404);
+      writeJson(res, latest ? localCodexStatus(latest, state.lastSuccessfulUsageAt ?? state.lastSuccessfulSendAt) : { error: "not_found" }, latest ? 200 : 404);
       return;
     }
     if (req.url === "/api/codex/usage/summary") {
       const latest = await readSnapshot(config.usageLatestPath);
-      writeJson(res, latest ? summarizeCodexUsage(latest, state.lastSuccessfulUsageAt ?? state.lastSuccessfulSendAt) : { error: "not_found" }, latest ? 200 : 404);
+      writeJson(res, latest ? localCodexStatus(latest, state.lastSuccessfulUsageAt ?? state.lastSuccessfulSendAt) : { error: "not_found" }, latest ? 200 : 404);
       return;
     }
     if (req.url === "/api/agent/health/latest") {
       const latest = await readJson(config.agentHealthOutputFile);
-      writeJson(res, latest ?? { error: "not_found" }, latest ? 200 : 404);
+      writeJson(res, latest ? localAgentHealthStatus(latest) : { error: "not_found" }, latest ? 200 : 404);
       return;
     }
     if (req.url === "/api/server/status") {
@@ -58,18 +58,43 @@ export function startHealthServer(config: Config): http.Server {
       collector: config.collectorMode,
       last_success: state.lastSuccessfulSendAt,
       last_usage_success: state.lastSuccessfulUsageAt,
-      last_error: state.lastError,
+      last_error_present: Boolean(state.lastError),
       pending_spool_count: await countSpooledEvents(config.spoolDir),
       pending_batch_spool_count: await countSpooledBatches(config.spoolDir),
       last_payload_captured_at: state.lastPayloadCapturedAt,
-      last_server_batch_captured_at: state.lastServerBatchCapturedAt,
-      node_id: config.nodeId,
-      hostname: config.hostname
+      last_server_batch_captured_at: state.lastServerBatchCapturedAt
     };
     writeJson(res, body);
   });
   server.listen(config.healthPort, config.healthHost);
   return server;
+}
+
+function localCodexStatus(snapshot: CodexUsageSnapshot, lastSuccessAt?: string): Record<string, unknown> {
+  const { node_id: _nodeId, ...safe } = summarizeCodexUsage(snapshot, lastSuccessAt);
+  return { ...safe, output_allowlist_version: "jerry.agent.health.v1" };
+}
+
+function localAgentHealthStatus(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false, status_available: false, output_allowlist_version: "jerry.agent.health.v1" };
+  const record = value as Record<string, unknown>;
+  const status = objectRecord(record.status);
+  const outputs = objectRecord(record.outputs);
+  const agent = objectRecord(record.agent);
+  return {
+    ok: status.ok === true,
+    degraded: status.degraded === true,
+    observed_at: typeof record.observed_at === "string" ? record.observed_at : null,
+    agent_version: typeof agent.version === "string" ? agent.version : null,
+    pending_spool_count: typeof outputs.pending_spool_count === "number" ? outputs.pending_spool_count : 0,
+    last_http_success_at: typeof outputs.last_http_success_at === "string" ? outputs.last_http_success_at : null,
+    last_http_error_present: Boolean(outputs.last_http_error_at),
+    output_allowlist_version: "jerry.agent.health.v1"
+  };
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 export async function waitForHealthServerListening(server: http.Server): Promise<void> {

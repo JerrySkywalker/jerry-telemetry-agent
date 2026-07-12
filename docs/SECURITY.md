@@ -13,6 +13,9 @@
 - Generic server daemon state contains only summary fields such as timestamps, counts, event types, node identity, collector names, and spool counts. It does not contain raw payloads.
 - Generic server daemon CLI status output exposes booleans, counts, and timestamps only. `/api/server/status` exposes a richer localhost-only safe summary, and `/api/server/batch/latest` returns a summary instead of raw payloads.
 - Agent health output sends only safe booleans, counts, timestamps, and string categories inside `telemetry.agent.health`. It records sensitive categories in `raw_omitted_keys` but never includes secret values, raw env, Authorization headers, raw `auth.json`, account ids, or raw backend responses.
+- Local health and status endpoints additionally omit node ID, hostname,
+  filesystem paths, and raw errors even when those values exist in persisted
+  telemetry state; endpoint DTOs use an explicit allowlist.
 - Collector names and event types are allowlisted by the typed registry. Unknown collector names fail closed, and arbitrary shell command collectors are intentionally not supported.
 - Event envelopes only accept registry-approved event types: `codex.usage.snapshot`, `telemetry.agent.health`, `node.snapshot`, `node.resources.snapshot`, `service.health.snapshot`, `docker.containers.snapshot`, `systemd.units.snapshot`, and `custom.snapshot`.
 - Local node-info and node-resources collectors do not read Codex auth, browser stores, cookie stores, `.env`, or user directories. Disk summaries use only generic drive or mount labels plus total/free/used percentages.
