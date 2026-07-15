@@ -5,10 +5,18 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Push-Location $repoRoot
 try {
   $failures = New-Object System.Collections.Generic.List[string]
+  $preservedEvidenceRoot = "artifacts/playwright/dashboard-mg39b"
+  $preservedEvidencePresent = Test-Path -LiteralPath $preservedEvidenceRoot -PathType Container
+  $preservedEvidenceTracked = @(git ls-files -- $preservedEvidenceRoot).Count -gt 0
+  $preservedEvidenceExcluded = $false
   $paths = git ls-files --cached --others --exclude-standard
 
   foreach ($path in $paths) {
     $normalized = $path -replace "\\", "/"
+    if ($normalized -eq $preservedEvidenceRoot -or $normalized.StartsWith($preservedEvidenceRoot + "/")) {
+      $preservedEvidenceExcluded = $true
+      continue
+    }
     if ($normalized -match "^(node_modules|dist|coverage|state|spool|tmp)/") {
       continue
     }
@@ -44,6 +52,9 @@ try {
   }
 
   Write-Host "Light secret scan completed."
+  Write-Host "preserved_evidence_present=$preservedEvidencePresent"
+  Write-Host "preserved_evidence_untracked=$($preservedEvidencePresent -and -not $preservedEvidenceTracked)"
+  Write-Host "preserved_evidence_excluded=$preservedEvidenceExcluded"
 } finally {
   Pop-Location
 }
