@@ -13,6 +13,7 @@ function Test-ForbiddenPackagePath {
   $leaf = [IO.Path]::GetFileName($normalized)
   if ($leaf -eq ".env" -or $leaf -like ".env.*" -or $leaf -eq "auth.json") { return $true }
   if ($normalized -match "(^|/)(node_modules|state|logs|\.smoke|tmp|coverage|backups?)(/|$)") { return $true }
+  if ($normalized -match "(^|/)artifacts/playwright/dashboard-mg39b(/|$)") { return $true }
   if ($normalized -match "\.raw\.local-only\.json$") { return $true }
   if ($normalized -match "(generated|local).*(credential|secret)") { return $true }
   return $false
@@ -130,7 +131,7 @@ try {
     package_version = $version
     git_commit = (git rev-parse HEAD).Trim()
     included_top_level_entries = @($topDirs)
-    excluded_patterns = @(".env", ".env.*", "auth.json", "state/", "logs/", ".smoke/", "node_modules/", "*.raw.local-only.json", "generated credentials", "backups/")
+    excluded_patterns = @(".env", ".env.*", "auth.json", "state/", "logs/", ".smoke/", "node_modules/", "artifacts/playwright/dashboard-mg39b/", "*.raw.local-only.json", "generated credentials", "backups/")
     forbidden_marker_scan = if ($scanFailures.Count -eq 0) { "pass" } else { "fail" }
     forbidden_marker_failures_count = $scanFailures.Count
   }
